@@ -151,7 +151,7 @@
 /* The ladder: five blocks of the mempool, as tall as the block being mined, a dashed line between them. */
 .bs-ladder {
     --lu: var(--u);
-    --bs-depth: calc(var(--lu) * 0.35);
+    --bs-depth: calc(var(--lu) * 0.19);
     position: relative;
     flex: none;
     width: calc(var(--lu) * 5.6);
@@ -169,11 +169,11 @@
 
 .bs-rung {
     position: absolute;
-    top: calc(var(--u) * 4.2 * var(--rung));
+    top: calc(var(--u) * 4 * var(--rung));
     left: 0;
     display: block;
     width: 100%;
-    height: calc(var(--u) * 4.1);
+    height: calc(var(--u) * 3.94);
     padding: 0;
     border: 0;
     background: none;
@@ -248,6 +248,29 @@
     font-size: clamp(10px, calc(var(--u) * 0.46), 12px);
     font-variant-numeric: tabular-nums;
 }
+
+/* The next transaction: the last row of the ladder, dashed, as a block still waiting. */
+.bs-next {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: calc(var(--u) * 0.86);
+    padding-inline: 6px;
+    border: 1px dashed rgb(255 255 255 / 28%);
+    border-radius: 4px;
+    color: var(--color-ink-2);
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.bs-next[hidden] { display: none; }
+.bs-next svg { height: 70%; width: auto; max-width: 50%; opacity: 0.85; }
+.bs-next-label { font-weight: 700; }
+.bs-next-size { margin-left: auto; color: var(--color-ink-3); }
 
 /* The fuse: a line that burns away along the oldest. */
 .bs-fuse {
@@ -340,7 +363,9 @@
     }
 
     .is-compact .bs-row { position: relative; justify-content: center; gap: 8px; }
-    .is-compact .bs-ladder { --lu: var(--strip-unit); --bs-depth: 5px; width: var(--strip); }
+    .is-compact .bs-ladder { --lu: var(--strip-unit); --bs-depth: 4px; width: var(--strip); }
+    .is-compact .bs-ladder:not(.is-open) .bs-next { padding-inline: 4px; gap: 3px; }
+    .is-compact .bs-ladder:not(.is-open) .bs-next-size { display: none; }
     .is-compact .bs-ladder::before { left: -5px; }
     .is-compact .bs-help { display: none; }
     .is-compact .bs-button { padding-inline: 2px; }
@@ -356,7 +381,7 @@
     /* Unfolded: the ladder in full size over the block. */
     .is-compact .bs-ladder.is-open {
         --lu: var(--u);
-        --bs-depth: calc(var(--u) * 0.35);
+        --bs-depth: calc(var(--u) * 0.19);
         position: absolute;
         top: 0;
         right: 0;

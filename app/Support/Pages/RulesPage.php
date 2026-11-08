@@ -584,9 +584,10 @@ final class RulesPage
             'items' => [
                 __('The mempool holds each of the 21 forms of one to five cells twice, in a hidden order. :rungs of them stand on the ladder, the oldest on top.', ['rungs' => BlockspaceRules::RUNGS]),
                 __('A transaction brings its size plus its rung: :bonus from the oldest to the newest. Everything behind what you take moves up a rung, and the next one comes in.', ['bonus' => implode(', ', BlockspaceRules::BONUS)]),
+                __('The next transaction waits under the ladder for both sides to see; the order behind it stays hidden.'),
                 __('The sides move Orange, Blue, Blue, Orange, again and again.'),
                 __('Your first stones cover your start cell: e2 for Orange, e20 for Blue. After that your new stones touch your own at a corner and never along an edge. The other side\'s stones only take their cells.'),
-                __('You may pass. A side with nothing to set has to. Either way the oldest transaction falls out.'),
+                __('You may pass. A side with nothing to set is passed over by the game, and the other side moves on: blocking the other miner is part of the game. Either way the oldest transaction falls out, and the move list notes every turn passed over.'),
                 __('Blitz adds the fuse: at every second turn the oldest transaction falls out by itself.'),
                 __('The game ends when the ladder is empty or after :passes passes in a row. The higher yield wins, an equal yield is a draw.', ['passes' => BlockspaceRules::PASS_LIMIT]),
                 __('Take a transaction, turn it and set it. With a mouse: left click takes and sets, right click turns, a long right click mirrors. The board shows no places, finding them is the game.'),

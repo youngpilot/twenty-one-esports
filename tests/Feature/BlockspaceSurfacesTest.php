@@ -56,8 +56,8 @@ test('two games that differ only in what is hidden have the same public card', f
 
     expect($before)->toContain('v=');
 
-    // The same board and ladder, another order of what is to come and another deal.
-    $position['queue'] = strrev($position['queue']);
+    // The same board, ladder and next transaction, another order behind it and another deal.
+    $position['queue'] = $position['queue'][0].strrev(substr($position['queue'], 1));
     $position['deck'] = strrev($position['deck']);
     $game->forceFill(['position' => $rules->serialize($position)])->save();
 
@@ -70,13 +70,13 @@ test('two games that differ only in what is hidden have the same public card', f
     expect(blockspaceOgImage($this, $game->refresh()))->not->toBe($before);
 });
 
-test('the card facts carry how much is left, not what', function () {
+test('the card facts carry the next transaction and how much is left, not the order behind it', function () {
     $game = blockspaceSurfaceGame();
     $position = (new BlockspaceRules)->deserialize($game->position);
     $facts = (new BlockspaceRules)->deserialize(PageCardFacts::board($game)['position']);
 
     expect(strlen($facts['queue']))->toBe(strlen($position['queue']))
-        ->and($facts['queue'])->toBe(str_repeat('a', strlen($position['queue'])))
+        ->and($facts['queue'])->toBe($position['queue'][0].str_repeat('a', strlen($position['queue']) - 1))
         ->and($facts['deck'])->not->toBe($position['deck'])
         ->and($facts['board'])->toBe($position['board'])
         ->and($facts['pool'])->toBe($position['pool']);

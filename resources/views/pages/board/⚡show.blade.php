@@ -601,10 +601,10 @@ new #[Layout('layouts::app', ['realtime' => true, 'scripts' => ['resources/js/bo
                         <span x-text="@js(__('Showing move :n of :total')).replace(':n', shownPly).replace(':total', state.moves.length)"></span>
                         <button type="button" class="cursor-pointer text-ink underline decoration-edge underline-offset-4" x-on:click="browse(state.moves.length)" data-test="history-back-to-game">{{ __('Back to the game') }}</button>
                     </p>
-                    <ol class="m-0 grid max-h-60 min-h-0 list-none grid-cols-2 content-start gap-x-2 overflow-y-auto p-0 text-[13px] tabular-nums lg:max-h-none lg:grow" data-test="moves">
+                    <ol class="m-0 grid max-h-60 min-h-0 list-none content-start gap-x-2 overflow-y-auto p-0 text-[13px] tabular-nums lg:max-h-none lg:grow" :class="layout.input === 'pieces' ? 'grid-cols-1' : 'grid-cols-2'" data-test="moves">
                         <template x-for="m in state.moves" :key="m.ply">
                             <li class="min-w-0 border-b border-hairline"><button type="button" x-on:click="browse(m.ply)" :aria-current="shownPly === m.ply ? 'step' : null" data-test="move"
-                                        class="flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-sm px-2 text-left text-ink" :class="shownPly === m.ply ? 'bg-btc-press font-bold text-btc-hi' : 'hover:bg-row-hover'"><span class="w-7 shrink-0 text-ink-3" x-text="m.ply % 2 ? Math.ceil(m.ply / 2) + '.' : ''"></span><b class="truncate font-bold" x-text="m.notation"></b></button></li>
+                                        class="flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-sm px-2 text-left text-ink" :class="shownPly === m.ply ? 'bg-btc-press font-bold text-btc-hi' : 'hover:bg-row-hover'"><span class="w-7 shrink-0 text-ink-3" x-text="layout.input === 'pieces' ? m.ply + '.' : (m.ply % 2 ? Math.ceil(m.ply / 2) + '.' : '')"></span><b class="truncate font-bold" x-text="m.notation"></b></button></li>
                         </template>
                     </ol>
                 </div>

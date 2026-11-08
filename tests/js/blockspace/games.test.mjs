@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import { applyMove, moveText, moves, positionOf, stateOf, winner } from '../../../resources/js/blockspace/engine.js';
+import { applyMove, cellOf, moveText, moves, notationOf, positionOf, stateOf, winner } from '../../../resources/js/blockspace/engine.js';
 
 const games = JSON.parse(readFileSync(new URL('../../Fixtures/blockspace-games.json', import.meta.url), 'utf8'));
 const md5 = (text) => createHash('md5').update(text).digest('hex');
@@ -25,4 +25,13 @@ test('every game replays to the same positions, legal moves and winner', () => {
         }
         assert.equal(winner(g), game.winner);
     }
+});
+
+test('the record notes the turns the game passes over, as the server writes them', () => {
+    // Blue's only corners are taken: after Orange's move Blue, to move twice, has nothing to set (BlockspaceRulesTest).
+    const board = new Array(189).fill('.');
+    for (const [name, side] of [['a1', 'w'], ['e20', 'b'], ['d19', 'w'], ['f19', 'w'], ['d21', 'w'], ['f21', 'w']]) board[cellOf(name)] = side;
+    const g = stateOf(['n', 0, 0, 0, '11', 0, 'aaaaa', 'bbbbb', 'aabbccddeeffgghhiijjkkllmmnnooppqqrrssttuu', board.join('')].join(' '));
+
+    assert.equal(notationOf(g, '0:b2'), '₿ I1 b2 +5 · ⚡ – · ⚡ –');
 });
