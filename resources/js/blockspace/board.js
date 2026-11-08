@@ -12,7 +12,7 @@
  */
 // board.css comes with boardGame.js: as a dependency of this lazily loaded module it kept the import pending (see there).
 import { setFocus } from '../focusMode.js';
-import { BONUS, C, N, NAMES, ORDER, ORI, R, SIZE, START, cellName, cellOf, flip, key, moveText, moves, readPieces, refuse, rot } from './engine.js';
+import { BONUS, C, N, NAMES, ORDER, ORI, R, SIZE, START, cellName, cellOf, flip, key, moveText, moves, readPieces, refuse, rot, VISIBLE } from './engine.js';
 import { CELL, SIDES, element, form, joints, stone, stoneDefs } from './stones.js';
 
 /** A block's colour by what it pays, from a cheap green to a rich magenta, as a fee explorer shows the mempool. */
@@ -31,6 +31,8 @@ const MIN_STRIP = 64;
 const MAX_CELL = 40;
 /** The block, the gap and the ladder, in cells (board.css). */
 const STAGE_UNITS = 15.3;
+/** The waiting row under the block in units, with the gap above it (board.css .bsp-queue). */
+const QUEUE_UNITS = 2.2;
 const SIDE_KEYS = ['w', 'b'];
 /** The colour of stones that may not lie where they are shown. */
 const REFUSED = '#FF5A5F';
@@ -240,15 +242,16 @@ export function mountPieceBoard(c) {
     fold.dataset.test = 'ladder-fold';
     fold.hidden = true;
     fold.addEventListener('click', () => unfold(!ladder.classList.contains('is-open')));
-    const nextSlot = html('div', 'bsp-next');
-    nextSlot.dataset.test = 'ladder-next';
-    nextSlot.setAttribute('role', 'note');
-    const nextForms = html('span', 'bsp-next-forms');
-    nextForms.setAttribute('aria-hidden', 'true');
-    // No words in the row: five forms need its width. The dashed row under the ladder says "waiting", the title says what.
-    nextSlot.title = words.next;
-    nextSlot.append(nextForms);
-    ladder.append(fold, nextSlot);
+    ladder.append(fold);
+    // The next five wait in grey under the block, the first on the right: they move right, then up into the ladder
+    // (user, 2026-11-09). Colour stays with what can be taken now, at the block's size.
+    const queueRow = html('div', 'bsp-queue');
+    queueRow.dataset.test = 'queue-next';
+    queueRow.setAttribute('role', 'note');
+    queueRow.title = words.next;
+    const waits = Array.from({ length: VISIBLE }, () => queueRow.appendChild(html('div', 'bsp-wait is-empty')));
+    row.after(queueRow);
+    let waiting = [];
 
     const note = html('p', 'bsp-note');
     note.setAttribute('role', 'alert');
@@ -310,23 +313,39 @@ export function mountPieceBoard(c) {
     }
 
     /** The transaction to come next, small under the ladder: everyone sees it, nobody can take it yet. */
-    /** The next five transactions, the next block, in the order they come in; all at one scale, so their sizes compare. */
-    function drawNext(g) {
-        nextSlot.hidden = !g.next.length;
-        const forms = g.next.map((f) => NAMES[f]).join(' ');
-        if (!g.next.length || nextSlot.dataset.forms === forms) return;
-        nextSlot.dataset.forms = forms;
-        nextForms.replaceChildren(...g.next.map((f) => {
+    /** The waiting five, the first on the right under the ladder. When the first goes up, the others move right one place. */
+    function drawQueue(g) {
+        if (g.next.join() === waiting.join()) return;
+        // How many went up since the last draw: the new row starts where the old one went on.
+        let shift = 0;
+        for (let k = 1; k < waiting.length && !shift; k++) {
+            if (g.next.length && g.next.slice(0, waiting.length - k).every((f, i) => f === waiting[i + k])) shift = k;
+        }
+        waiting = g.next.slice();
+        waits.forEach((wait, index) => {
+            const f = waiting[VISIBLE - 1 - index];
+            wait.classList.toggle('is-empty', f === undefined);
+            if (f === undefined) return wait.replaceChildren();
             const shape = ORI[f][flatOf(f)];
             const height = Math.max(...shape.map((part) => part[0])) + 1;
             const width = Math.max(...shape.map((part) => part[1])) + 1;
-            const picture = element('svg', { viewBox: `0 0 ${width * CELL} ${height * CELL}` });
+            const picture = element('svg', { viewBox: `0 0 ${width * CELL} ${height * CELL}`, 'aria-hidden': 'true' });
             picture.style.setProperty('--rows', height);
             picture.append(form('tx', shape));
-
-            return picture;
-        }));
-        nextSlot.setAttribute('aria-label', words.next + ': ' + g.next.map((f) => NAMES[f] + ' (' + SIZE[f] + ' vB)').join(', '));
+            wait.replaceChildren(picture);
+        });
+        queueRow.setAttribute('aria-label', words.next + ': ' + waiting.map((f) => NAMES[f] + ' (' + SIZE[f] + ' vB)').join(', '));
+        if (!shift || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        // Drawn where they stood, then let go: each block slides one place to the right per transaction gone up.
+        waits.forEach((wait) => {
+            wait.style.transition = 'none';
+            wait.style.transform = `translateX(calc(${-shift} * (100% + var(--gap))))`;
+        });
+        void queueRow.offsetWidth;
+        waits.forEach((wait) => {
+            wait.style.transition = '';
+            wait.style.transform = '';
+        });
     }
 
     /** One element per transaction, matched by form and order: what is taken leaves, the rest moves up a rung. */
@@ -400,7 +419,7 @@ export function mountPieceBoard(c) {
         orderMarks.forEach((mark, index) => mark.classList.toggle('is-now', active && !finalRound && index === shown.ti));
         queueLine.textContent = words.queue.replace(':count', shown.queue);
         drawLadder(shown);
-        drawNext(shown);
+        drawQueue(shown);
         const holding = !!hand && live();
         [rotateButton, mirrorButton, setButton].forEach((node) => node.setAttribute('aria-disabled', holding ? 'false' : 'true'));
         passButton.setAttribute('aria-disabled', live() ? 'false' : 'true');
@@ -630,7 +649,7 @@ export function mountPieceBoard(c) {
         if (bar) bar.style.top = upperEdge() + 'px';
         const width = stage.parentElement.clientWidth + 2 * PHONE_BLEED;
         const room = edge - upperEdge() - barHeight - head.offsetHeight - dock.offsetHeight - 16;
-        const size = Math.max(14, Math.floor(Math.min(room / R, (width - PHONE_GAP - MIN_STRIP) / C)));
+        const size = Math.max(14, Math.floor(Math.min(room / (R + QUEUE_UNITS), (width - PHONE_GAP - MIN_STRIP) / C)));
         // A tablet has room for the whole ladder, a phone only for the strip that is left.
         const strip = Math.min(width - PHONE_GAP - size * C, size * 5.6);
         stage.style.setProperty('--u', size + 'px');
@@ -668,8 +687,8 @@ export function mountPieceBoard(c) {
         const under = dock.offsetHeight + 28;
         // Where the block stands, or, where that leaves too little, with the page scrolled so that it starts under the header.
         const header = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 56;
-        const inPlace = (edge - (row.getBoundingClientRect().top + scrollY) - under) / R;
-        const scrolled = (edge - header - head.offsetHeight - 16 - under) / R;
+        const inPlace = (edge - (row.getBoundingClientRect().top + scrollY) - under) / (R + QUEUE_UNITS);
+        const scrolled = (edge - header - head.offsetHeight - 16 - under) / (R + QUEUE_UNITS);
         scrollsTo = inPlace < COMFORTABLE_CELL;
         const size = Math.floor(Math.min(width / STAGE_UNITS, Math.max(scrollsTo ? scrolled : inPlace, low ? 18 : 20), MAX_CELL));
         stage.style.setProperty('--u', Math.max(14, size) + 'px');

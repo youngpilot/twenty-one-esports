@@ -265,32 +265,55 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* The next five transactions: the last row of the ladder, dashed, as the block still waiting. */
-.bsp-next {
-    position: absolute;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    height: calc(var(--u) * 0.86);
-    padding-inline: 6px;
-    border: 1px dashed rgb(255 255 255 / 28%);
-    border-radius: 4px;
-    color: var(--color-ink-2);
-    font-size: 11px;
-    white-space: nowrap;
+/* The next five, in grey under the block, the first on the right: a chevron between two says they move right,
+   the arrow over the last that it goes up into the ladder. Grey and smaller than the block: not yet to be taken. */
+.bsp-queue {
+    --gap: calc(var(--u) * 0.45);
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: var(--gap);
+    height: calc(var(--u) * 1.7);
+    overflow-x: clip;
 }
 
-.bsp-next[hidden] { display: none; }
-/* All five as long as the row is wide enough, the first three in a narrow strip (the folded ladder on a small phone). */
-.bsp-next { container-type: inline-size; }
-@container (width < 150px) { .bsp-next-forms svg:nth-child(n + 4) { display: none; } }
+.bsp-wait {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid rgb(255 255 255 / 12%);
+    border-radius: 3px;
+    background: #22253a;
+    transition: transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
 
-/* One scale for all five: a cell is the same size in each, so a big transaction looks big. */
-.bsp-next-forms { display: flex; flex: 1; align-items: center; gap: 4px; min-width: 0; overflow: hidden; }
-.bsp-next-forms svg { flex: 0 1 auto; min-width: 0; width: auto; height: calc(var(--u) * 0.24 * var(--rows)); opacity: 0.85; }
+.bsp-wait.is-empty { border-style: dashed; background: none; }
+.bsp-wait svg { width: auto; height: calc(var(--u) * 0.42 * var(--rows)); opacity: 0.55; }
+
+.bsp-wait:not(:last-child)::after {
+    position: absolute;
+    top: 50%;
+    right: calc(var(--gap) * -1);
+    width: var(--gap);
+    color: rgb(255 255 255 / 60%);
+    font-size: calc(var(--u) * 0.6);
+    line-height: 1;
+    text-align: center;
+    content: '›';
+    transform: translateY(-55%);
+}
+
+.bsp-wait:last-child::before {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    color: rgb(255 255 255 / 70%);
+    font-size: calc(var(--u) * 0.8);
+    font-weight: 700;
+    line-height: 1.6;
+    content: '↑';
+    transform: translateX(-50%);
+}
 
 /* The fuse: a line that burns away along the oldest. */
 .bsp-fuse {
@@ -384,7 +407,6 @@
 
     .is-compact .bsp-row { position: relative; justify-content: center; gap: 8px; }
     .is-compact .bsp-ladder { --lu: var(--strip-unit); --bs-depth: 4px; width: var(--strip); }
-    .is-compact .bsp-ladder:not(.is-open) .bsp-next { padding-inline: 4px; gap: 3px; }
     .is-compact .bsp-ladder::before { left: -5px; }
     .is-compact .bsp-help { display: none; }
     .is-compact .bsp-button { padding-inline: 2px; }
@@ -484,5 +506,6 @@
 @media (prefers-reduced-motion: reduce) {
     .bsp-start.is-due .bsp-start-mark,
     .bsp-fuse { animation: none; }
-    .bsp-rung { transition: none; }
+    .bsp-rung,
+    .bsp-wait { transition: none; }
 }
