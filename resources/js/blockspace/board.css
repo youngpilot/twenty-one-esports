@@ -284,6 +284,10 @@
 }
 
 .bsp-next[hidden] { display: none; }
+/* All five as long as the row is wide enough, the first three in a narrow strip (the folded ladder on a small phone). */
+.bsp-next { container-type: inline-size; }
+@container (width < 150px) { .bsp-next-forms svg:nth-child(n + 4) { display: none; } }
+
 /* One scale for all five: a cell is the same size in each, so a big transaction looks big. */
 .bsp-next-forms { display: flex; flex: 1; align-items: center; gap: 4px; min-width: 0; overflow: hidden; }
 .bsp-next-forms svg { flex: 0 1 auto; min-width: 0; width: auto; height: calc(var(--u) * 0.24 * var(--rows)); opacity: 0.85; }
@@ -381,7 +385,6 @@
     .is-compact .bsp-row { position: relative; justify-content: center; gap: 8px; }
     .is-compact .bsp-ladder { --lu: var(--strip-unit); --bs-depth: 4px; width: var(--strip); }
     .is-compact .bsp-ladder:not(.is-open) .bsp-next { padding-inline: 4px; gap: 3px; }
-    .is-compact .bsp-ladder:not(.is-open) .bsp-next-forms svg:nth-child(n + 4) { display: none; }
     .is-compact .bsp-ladder::before { left: -5px; }
     .is-compact .bsp-help { display: none; }
     .is-compact .bsp-button { padding-inline: 2px; }
