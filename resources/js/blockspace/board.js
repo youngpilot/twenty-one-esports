@@ -234,7 +234,13 @@ export function mountPieceBoard(c) {
     fold.dataset.test = 'ladder-fold';
     fold.hidden = true;
     fold.addEventListener('click', () => unfold(!ladder.classList.contains('is-open')));
-    ladder.append(fold);
+    const nextSlot = html('div', 'bs-next');
+    nextSlot.dataset.test = 'ladder-next';
+    nextSlot.setAttribute('role', 'note');
+    const nextPicture = element('svg', { 'aria-hidden': 'true' });
+    const nextSize = html('span', 'bs-next-size');
+    nextSlot.append(html('span', 'bs-next-label', words.next), nextPicture, nextSize);
+    ladder.append(fold, nextSlot);
 
     const note = html('p', 'bs-note');
     note.setAttribute('role', 'alert');
@@ -293,6 +299,20 @@ export function mountPieceBoard(c) {
         ladder.append(node);
 
         return tile;
+    }
+
+    /** The transaction to come next, small under the ladder: everyone sees it, nobody can take it yet. */
+    function drawNext(g) {
+        nextSlot.hidden = g.next < 0;
+        if (g.next < 0 || nextSlot.dataset.form === NAMES[g.next]) return;
+        nextSlot.dataset.form = NAMES[g.next];
+        const shape = ORI[g.next][flatOf(g.next)];
+        const height = Math.max(...shape.map((part) => part[0])) + 1;
+        const width = Math.max(...shape.map((part) => part[1])) + 1;
+        nextPicture.setAttribute('viewBox', `0 0 ${width * CELL} ${height * CELL}`);
+        nextPicture.replaceChildren(form('tx', shape));
+        nextSize.textContent = SIZE[g.next] + ' vB';
+        nextSlot.setAttribute('aria-label', words.next + ': ' + NAMES[g.next] + ', ' + SIZE[g.next] + ' vB');
     }
 
     /** One element per transaction, matched by form and order: what is taken leaves, the rest moves up a rung. */
@@ -361,11 +381,16 @@ export function mountPieceBoard(c) {
         orderMarks.forEach((mark, index) => mark.classList.toggle('is-now', active && index === shown.ti));
         queueLine.textContent = words.queue.replace(':count', shown.queue);
         drawLadder(shown);
+        drawNext(shown);
         const holding = !!hand && live();
         [rotateButton, mirrorButton, setButton].forEach((node) => node.setAttribute('aria-disabled', holding ? 'false' : 'true'));
         passButton.setAttribute('aria-disabled', live() ? 'false' : 'true');
-        const info = !c.error && active && shown.passes > 0;
-        const noteText = c.error || (info ? words.passed : '');
+        // A side the game passed over: who, and why the other one moves again.
+        const record = c.shownPly > 0 ? c.state.moves?.[c.shownPly - 1]?.notation ?? '' : '';
+        const skipped = record.split(' · ').slice(1).map((note) => (note.startsWith('₿') ? c.t.white : c.t.black));
+        const skippedText = skipped.length ? (skipped.length > 1 && new Set(skipped).size === 1 ? words.skippedTwice : words.skipped).replace(':side', skipped[0]) : '';
+        const info = !c.error && (skippedText !== '' || (active && shown.passes > 0));
+        const noteText = c.error || (skippedText || (info ? words.passed : ''));
         if (note.textContent !== noteText) note.textContent = noteText;
         note.classList.toggle('is-info', info);
         const last = c.state.moves?.[c.shownPly - 1]?.notation;

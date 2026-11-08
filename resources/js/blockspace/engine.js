@@ -361,8 +361,9 @@ export function think(g, level, r, budget) {
         const q = top[i++ % top.length];
         const h = clone(g);
         // What comes next is hidden from the bot as well: every look ahead gets an order of its own.
-        for (let k = h.queue.length - 1; k > 0; k--) {
-            const j = Math.floor(r() * (k + 1));
+        // The next one is public and stays first.
+        for (let k = h.queue.length - 1; k > 1; k--) {
+            const j = 1 + Math.floor(r() * k);
             [h.queue[k], h.queue[j]] = [h.queue[j], h.queue[k]];
         }
         play(h, q.m.i, q.m.cells);
@@ -387,6 +388,7 @@ export function piecesOf(g) {
     g.pool.forEach((tx, rung) => {
         pieces['tx' + rung] = { side: 'w', kind: NAMES[tx.f] };
     });
+    if (g.queue.length) pieces.next = { side: 'w', kind: NAMES[g.queue[0].f] };
     pieces.state = { side: g.side === 0 ? 'w' : 'b', kind: [g.ti, g.score[0], g.score[1], g.queue.length, g.fuse ? 1 : 0, (g.played[0] ? '1' : '0') + (g.played[1] ? '1' : '0'), g.passes].join(':') };
 
     return pieces;
@@ -403,9 +405,10 @@ export function readPieces(pieces) {
         const piece = pieces?.['tx' + rung];
         if (piece) pool.push({ f: NAMES.indexOf(piece.kind) });
     }
+    const next = pieces?.next ? NAMES.indexOf(pieces.next.kind) : -1;
     const [ti, white, black, queue, fuse, played, passes] = (pieces?.state?.kind ?? '0:0:0:0:0:00:0').split(':');
 
-    return { board, pool, score: [Number(white), Number(black)], ti: Number(ti), side: ORDER[Number(ti)], queue: Number(queue), fuse: fuse === '1', played: [played[0] === '1', played[1] === '1'], passes: Number(passes) };
+    return { board, pool, score: [Number(white), Number(black)], ti: Number(ti), side: ORDER[Number(ti)], queue: Number(queue), fuse: fuse === '1', played: [played[0] === '1', played[1] === '1'], passes: Number(passes), next };
 }
 
 /** Plays a move in the league's text; false for text that is none, or a placement the rules refuse. */
@@ -428,8 +431,23 @@ export function applyMove(g, text) {
 /** The move as the game record writes it, for the position before it. */
 export function notationOf(g, text) {
     const sign = SIGNS[g.side];
-    if (text === 'pass') return sign + ' –';
+    if (text === 'pass') return sign + ' –' + passedOver(g, text);
     const [slot, names] = text.split(':');
 
-    return sign + ' ' + NAMES[g.pool[Number(slot)].f] + ' ' + names.split(',')[0] + ' +' + fee(g, Number(slot));
+    return sign + ' ' + NAMES[g.pool[Number(slot)].f] + ' ' + names.split(',')[0] + ' +' + fee(g, Number(slot)) + passedOver(g, text);
+}
+
+/** The turns the game passes over after this move, ` · ⚡ –` for each side that has nothing to set (BlockspaceRules). */
+function passedOver(g, text) {
+    const next = clone(g);
+    applyMove(next, text);
+    const forced = next.passes - (text === 'pass' ? g.passes + 1 : 0);
+    let turn = (g.ti + 1) % 4;
+    let notes = '';
+    for (let skip = 0; skip < forced; skip++) {
+        notes += ' · ' + SIGNS[ORDER[turn]] + ' –';
+        turn = (turn + 1) % 4;
+    }
+
+    return notes;
 }

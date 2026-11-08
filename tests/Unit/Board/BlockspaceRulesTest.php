@@ -149,9 +149,35 @@ test('the view hides what comes next and says the rest', function () {
 
     expect($view['input'])->toBe('pieces')
         ->and($view['points'])->toHaveCount(189)
-        ->and($view['pieces'])->toHaveKeys(['tx0', 'tx4', 'state'])
+        ->and($view['pieces'])->toHaveKeys(['tx0', 'tx4', 'next', 'state'])
+        ->and($view['pieces']['next']['kind'])->toBe(array_keys(BlockspaceRules::FORMS)[strpos('abcdefghijklmnopqrstu', $position['queue'][0])])
         ->and($view['pieces']['state']['kind'])->toBe('0:0:0:37:1:00:0')
         ->and(json_encode($view))->not->toContain($position['queue']);
+});
+
+test('the record notes every turn the game passed over, with the side', function () {
+    $rules = new BlockspaceRules;
+    // Blue's only corners are taken: after Orange's move Blue (to move twice) has nothing to set.
+    $position = blockspaceWith(['a1' => 'w', 'e20' => 'b', 'd19' => 'w', 'f19' => 'w', 'd21' => 'w', 'f21' => 'w'], ['pool' => 'aaaaa', 'queue' => 'bbbbb', 'played' => ['w' => true, 'b' => true]]);
+    $move = '0:b2';
+
+    expect($rules->legalMoves($position))->toContain($move)
+        ->and($rules->notation($position, $move))->toBe('₿ I1 b2 +5 · ⚡ – · ⚡ –')
+        ->and($rules->turn($rules->apply($position, $move)))->toBe('w');
+
+    // A move after which the other side can set notes nothing more.
+    $open = blockspaceWith(['a1' => 'w', 'e20' => 'b'], ['pool' => 'aaaaa', 'queue' => 'bbbbb', 'played' => ['w' => true, 'b' => true]]);
+    expect($rules->notation($open, $move))->toBe('₿ I1 b2 +5');
+});
+
+test('anyone may know the next transaction, nobody the order behind it', function () {
+    $rules = new BlockspaceRules;
+    $position = $rules->deal('rapid');
+    $public = $rules->withoutHidden($position);
+
+    expect($public['queue'][0])->toBe($position['queue'][0])
+        ->and(substr($public['queue'], 1))->toBe(str_repeat('a', strlen($position['queue']) - 1))
+        ->and($public['deck'])->toBe(str_repeat('a', 42));
 });
 
 test('text that is no position or move is refused', function () {

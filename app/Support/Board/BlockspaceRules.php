@@ -37,10 +37,10 @@ use InvalidArgumentException;
  * place is the game (user, 2026-11-04). So a snapshot carries none: up to 279 of them would
  * not fit a push (Reverb caps a message at 10 kB).
  *
- * The view: a cell per square with a point each, and two kinds of pieces no point draws, the
- * rungs `tx0` to `tx4` (kind: the form's name) and `state` (kind: `turn:white:black:queue:fuse:played:passes`,
+ * The view: a cell per square with a point each, and three kinds of pieces no point draws, the
+ * rungs `tx0` to `tx4` and `next`, the transaction to come next (kind: the form's name), and `state` (kind: `turn:white:black:queue:fuse:played:passes`,
  * the place in the turn order, both fees, the transactions still to come, the fuse and both
- * sides' first stones). The queue's order is no piece: nobody sees what comes next.
+ * sides' first stones). Only the next transaction is a piece: the order behind it nobody sees.
  *
  * The position is `fuse turn white black played passes pool queue deck board`: `z` with the
  * fuse and `n` without, the place in the turn order (0-3), both fees, `00` to `11` for the
@@ -133,7 +133,10 @@ final class BlockspaceRules implements BoardRules, DealtGame
 
     public function withoutHidden(mixed $position): mixed
     {
-        return [...$position, 'queue' => str_repeat('a', strlen($position['queue'])), 'deck' => str_repeat('a', strlen($position['deck']))];
+        // The next transaction is public (it waits under the ladder), the order behind it is not.
+        $queue = $position['queue'] === '' ? '' : $position['queue'][0].str_repeat('a', strlen($position['queue']) - 1);
+
+        return [...$position, 'queue' => $queue, 'deck' => str_repeat('a', strlen($position['deck']))];
     }
 
     public function revealsOnMove(mixed $position): bool
@@ -247,13 +250,34 @@ final class BlockspaceRules implements BoardRules, DealtGame
 
         if (preg_match(self::MOVE, $move, $parts) !== 1) {
             // A pass has no words of its own: the record reads the same in every language.
-            return $sign.' –';
+            return $sign.' –'.$this->passedOver($position, $move);
         }
 
         $slot = (int) $parts[1];
         $cells = explode(',', $parts[2]);
 
-        return $sign.' '.$this->name($position['pool'][$slot]).' '.$cells[0].' +'.$this->fee($position['pool'], $slot);
+        return $sign.' '.$this->name($position['pool'][$slot]).' '.$cells[0].' +'.$this->fee($position['pool'], $slot).$this->passedOver($position, $move);
+    }
+
+    /**
+     * The turns the game passed over after this move, because the side to move had nothing to set: ` · ⚡ –` for each,
+     * so the record says why a side moves again (user, 2026-11-08: Orange moved three times in a row, and nothing said why).
+     *
+     * @param  Position  $position
+     */
+    private function passedOver(array $position, string $move): string
+    {
+        $next = $this->apply($position, $move);
+        $forced = $next['passes'] - ($move === self::PASS ? $position['passes'] + 1 : 0);
+        $turn = ($position['ti'] + 1) % 4;
+        $notes = '';
+
+        for ($skip = 0; $skip < $forced; $skip++) {
+            $notes .= ' · '.(self::ORDER[$turn] === 'w' ? '₿' : '⚡').' –';
+            $turn = ($turn + 1) % 4;
+        }
+
+        return $notes;
     }
 
     public function outcome(mixed $position, array $history): ?array
@@ -302,6 +326,11 @@ final class BlockspaceRules implements BoardRules, DealtGame
 
         foreach ($position['pool'] === '' ? [] : str_split($position['pool']) as $rung => $letter) {
             $pieces['tx'.$rung] = ['side' => 'w', 'kind' => $this->name($letter)];
+        }
+
+        // The next transaction, open for both sides as the next block of a fee explorer; the order behind it stays hidden.
+        if ($position['queue'] !== '') {
+            $pieces['next'] = ['side' => 'w', 'kind' => $this->name($position['queue'][0])];
         }
 
         $pieces['state'] = ['side' => $this->turn($position), 'kind' => implode(':', [
