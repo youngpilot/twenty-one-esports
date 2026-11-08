@@ -27,11 +27,28 @@ test('every game replays to the same positions, legal moves and winner', () => {
     }
 });
 
-test('the record notes the turns the game passes over, as the server writes them', () => {
-    // Blue's only corners are taken: after Orange's move Blue, to move twice, has nothing to set (BlockspaceRulesTest).
+test('the record notes the side that is out, as the server writes it', () => {
+    // Blue's only corners are taken: after Orange's move Blue has nothing to set (BlockspaceRulesTest).
     const board = new Array(189).fill('.');
     for (const [name, side] of [['a1', 'w'], ['e20', 'b'], ['d19', 'w'], ['f19', 'w'], ['d21', 'w'], ['f21', 'w']]) board[cellOf(name)] = side;
-    const g = stateOf(['n', 0, 0, 0, '11', 0, 'aaaaa', 'bbbbb', 'aabbccddeeffgghhiijjkkllmmnnooppqqrrssttuu', board.join('')].join(' '));
+    const g = stateOf(['n', 0, 0, 0, '11', 0, '-', 'aaaaa', 'bbbbb', 'aabbccddeeffgghhiijjkkllmmnnooppqqrrssttuu', board.join('')].join(' '));
 
-    assert.equal(notationOf(g, '0:b2'), '₿ I1 b2 +5 · ⚡ – · ⚡ –');
+    assert.equal(notationOf(g, '0:b2'), '₿ I1 b2 +5 · ⚡ –');
+    assert.ok(applyMove(g, '0:b2'));
+    assert.equal(g.last, 'b');
+    assert.equal(g.side, 0);
+    assert.equal(g.pool.length, 5);
+    assert.ok(applyMove(g, '0:c3'));
+    assert.ok(g.over);
+    assert.equal(winner(g), 0);
+
+    // Neither side has anything left: the block is closed at once.
+    const full = new Array(189).fill('b');
+    full[cellOf('a1')] = 'w';
+    full[cellOf('b2')] = '.';
+    const closed = stateOf(['n', 0, 0, 0, '11', 0, '-', 'aaaaa', 'bbbbb', 'aabbccddeeffgghhiijjkkllmmnnooppqqrrssttuu', full.join('')].join(' '));
+    assert.equal(notationOf(closed, '0:b2'), '₿ I1 b2 +5 · ⚡ – · ₿ –');
+
+    // A position written before the final round still reads.
+    assert.equal(stateOf(['n', 0, 0, 0, '11', 0, 'aaaaa', 'bbbbb', 'aabbccddeeffgghhiijjkkllmmnnooppqqrrssttuu', board.join('')].join(' ')).last, '-');
 });

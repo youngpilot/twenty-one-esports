@@ -22,12 +22,15 @@ use InvalidArgumentException;
  * - The first stones of a side cover its start cell. After that a side's new stones touch at
  *   least one of its own stones at a corner and none of them along an edge. Stones of the
  *   other side do not matter, but no cell holds two stones.
- * - A player may pass instead. A side with no possible move has to: either way the oldest
- *   transaction falls out and the turn goes on.
+ * - A player may pass instead: the oldest transaction falls out and the turn goes on.
+ * - The final round: a side with nothing left to set is out. The other side sets one last
+ *   transaction, if it can, and the block is closed. Nothing falls out any more, so being
+ *   shut in costs the stones you could not set and gives the other side one block, not the
+ *   rest of the game (user, 2026-11-08: before, the side stuck first lost 70 % of the games).
  * - The fuse (the blitz mode): at every second turn the oldest transaction falls out by
  *   itself, so waiting for a rung costs more.
- * - The game ends when the ladder is empty or after 14 passes in a row. The side with the
- *   higher fees wins, equal fees are a draw.
+ * - The game ends when the ladder is empty, with the final round, or after 14 passes in a row.
+ *   The side with the higher fees wins, equal fees are a draw.
  *
  * Moves: `2:e2,e3,f3` sets the transaction on rung 2 (0 is the oldest) on these cells, read
  * from the top left; `pass` passes. A player's board proposes a move and legalMoves() judges it.
@@ -38,17 +41,19 @@ use InvalidArgumentException;
  * not fit a push (Reverb caps a message at 10 kB).
  *
  * The view: a cell per square with a point each, and three kinds of pieces no point draws, the
- * rungs `tx0` to `tx4` and `next`, the transaction to come next (kind: the form's name), and `state` (kind: `turn:white:black:queue:fuse:played:passes`,
- * the place in the turn order, both fees, the transactions still to come, the fuse and both
- * sides' first stones). Only the next transaction is a piece: the order behind it nobody sees.
+ * rungs `tx0` to `tx4` and `next`, the transaction to come next (kind: the form's name), and `state` (kind: `turn:white:black:queue:fuse:played:passes:last`,
+ * the place in the turn order, both fees, the transactions still to come, the fuse, both
+ * sides' first stones, the passes and the final round). Only the next transaction is a piece: the order behind it nobody sees.
  *
- * The position is `fuse turn white black played passes pool queue deck board`: `z` with the
+ * The position is `fuse turn white black played passes last pool queue deck board`: `z` with the
  * fuse and `n` without, the place in the turn order (0-3), both fees, `00` to `11` for the
- * sides that have set a stone, the passes in a row, the ladder, the queue and the whole deal
+ * sides that have set a stone, the passes in a row, the final round (`-` before it, `w` or `b`
+ * for the side that is out while the other sets its last transaction, `x` once the block is
+ * closed; a position without it is one from before the final round, read as `-`), the ladder, the queue and the whole deal
  * as forms (a = I1 … u = Z5, `-` for none), and the 189 cells row by row from a21 (`.`, `w`,
  * `b`). resources/js/blockspace/engine.js plays by the same text.
  *
- * @phpstan-type Position array{fuse: bool, ti: int, score: array{w: int, b: int}, played: array{w: bool, b: bool}, passes: int, pool: string, queue: string, deck: string, board: string}
+ * @phpstan-type Position array{fuse: bool, ti: int, score: array{w: int, b: int}, played: array{w: bool, b: bool}, passes: int, last: '-'|'w'|'b'|'x', pool: string, queue: string, deck: string, board: string}
  *
  * @implements BoardRules<Position>
  * @implements DealtGame<Position>
@@ -93,7 +98,7 @@ final class BlockspaceRules implements BoardRules, DealtGame
 
     private const LETTERS = 'abcdefghijklmnopqrstu';
 
-    private const POSITION = '/^([nz]) ([0-3]) (\d{1,4}) (\d{1,4}) ([01]{2}) (\d{1,2}) ([a-u]{1,5}|-) ([a-u]{1,37}|-) ([a-u]{42}) ([.wb]{189})$/';
+    private const POSITION = '/^([nz]) ([0-3]) (\d{1,4}) (\d{1,4}) ([01]{2}) (\d{1,2})(?: ([wbx-]))? ([a-u]{1,5}|-) ([a-u]{1,37}|-) ([a-u]{42}) ([.wb]{189})$/';
 
     private const MOVE = '/^([0-4]):([a-i]\d{1,2}(?:,[a-i]\d{1,2}){0,4})$/';
 
@@ -153,6 +158,7 @@ final class BlockspaceRules implements BoardRules, DealtGame
             'score' => ['w' => 0, 'b' => 0],
             'played' => ['w' => false, 'b' => false],
             'passes' => 0,
+            'last' => '-',
             'pool' => substr($deck, 0, self::RUNGS),
             'queue' => substr($deck, self::RUNGS),
             'deck' => $deck,
@@ -169,6 +175,7 @@ final class BlockspaceRules implements BoardRules, DealtGame
             $position['score']['b'],
             ($position['played']['w'] ? '1' : '0').($position['played']['b'] ? '1' : '0'),
             $position['passes'],
+            $position['last'],
             $position['pool'] === '' ? '-' : $position['pool'],
             $position['queue'] === '' ? '-' : $position['queue'],
             $position['deck'],
@@ -188,16 +195,27 @@ final class BlockspaceRules implements BoardRules, DealtGame
             'score' => ['w' => (int) $parts[3], 'b' => (int) $parts[4]],
             'played' => ['w' => $parts[5][0] === '1', 'b' => $parts[5][1] === '1'],
             'passes' => (int) $parts[6],
-            'pool' => $parts[7] === '-' ? '' : $parts[7],
-            'queue' => $parts[8] === '-' ? '' : $parts[8],
-            'deck' => $parts[9],
-            'board' => $parts[10],
+            'last' => match ($parts[7]) {
+                'w' => 'w',
+                'b' => 'b',
+                'x' => 'x',
+                default => '-',
+            },
+            'pool' => $parts[8] === '-' ? '' : $parts[8],
+            'queue' => $parts[9] === '-' ? '' : $parts[9],
+            'deck' => $parts[10],
+            'board' => $parts[11],
         ];
     }
 
     public function turn(mixed $position): string
     {
-        return self::ORDER[$position['ti']];
+        // In the final round every turn is the last block of the side that is still in.
+        return match ($position['last']) {
+            'w' => 'b',
+            'b' => 'w',
+            default => self::ORDER[$position['ti']],
+        };
     }
 
     public function legalMoves(mixed $position): array
@@ -220,7 +238,8 @@ final class BlockspaceRules implements BoardRules, DealtGame
     public function apply(mixed $position, string $move): mixed
     {
         if ($move === self::PASS) {
-            return $this->settle($this->skipped($position));
+            // Passing the last block gives it up: the block is closed.
+            return $this->inFinalRound($position) ? [...$position, 'last' => 'x'] : $this->settle($this->skipped($position));
         }
 
         if (preg_match(self::MOVE, $move, $parts) !== 1) {
@@ -238,6 +257,10 @@ final class BlockspaceRules implements BoardRules, DealtGame
         }
 
         $position['pool'] = substr_replace($position['pool'], '', $slot, 1);
+
+        if ($this->inFinalRound($position)) {
+            return [...$this->refilled($position), 'last' => 'x'];
+        }
 
         return $this->settle($this->nextTurn($this->refilled($position)));
     }
@@ -259,24 +282,26 @@ final class BlockspaceRules implements BoardRules, DealtGame
     }
 
     /**
-     * The turns the game passed over after this move, because the side to move had nothing to set: ` · ⚡ –` for each,
-     * so the record says why a side moves again (user, 2026-11-08: Orange moved three times in a row, and nothing said why).
+     * The sides this move leaves with nothing to set: ` · ⚡ –` for each, so the record says why the final round began
+     * (user, 2026-11-08: a side moving again with nothing said why left the players guessing).
      *
      * @param  Position  $position
      */
     private function passedOver(array $position, string $move): string
     {
-        $next = $this->apply($position, $move);
-        $forced = $next['passes'] - ($move === self::PASS ? $position['passes'] + 1 : 0);
-        $turn = ($position['ti'] + 1) % 4;
-        $notes = '';
-
-        for ($skip = 0; $skip < $forced; $skip++) {
-            $notes .= ' · '.(self::ORDER[$turn] === 'w' ? '₿' : '⚡').' –';
-            $turn = ($turn + 1) % 4;
+        if ($position['last'] !== '-') {
+            return '';
         }
 
-        return $notes;
+        $last = $this->apply($position, $move)['last'];
+        $sign = fn (string $side): string => ' · '.($side === 'w' ? '₿' : '⚡').' –';
+
+        return match ($last) {
+            '-' => '',
+            'w', 'b' => $sign($last),
+            // Both sides at once: first the side whose turn came next, then the other.
+            default => $sign(self::ORDER[($position['ti'] + 1) % 4]).$sign(self::ORDER[($position['ti'] + 1) % 4] === 'w' ? 'b' : 'w'),
+        };
     }
 
     public function outcome(mixed $position, array $history): ?array
@@ -285,7 +310,11 @@ final class BlockspaceRules implements BoardRules, DealtGame
             return null;
         }
 
-        $reason = $position['pool'] === '' ? 'mempool_empty' : 'block_full';
+        $reason = match (true) {
+            $position['last'] === 'x' => 'block_full',
+            $position['pool'] === '' => 'mempool_empty',
+            default => 'passes',
+        };
         $difference = $position['score']['w'] <=> $position['score']['b'];
 
         return ['result' => match ($difference) {
@@ -299,7 +328,8 @@ final class BlockspaceRules implements BoardRules, DealtGame
     {
         return [
             'mempool_empty' => 'The mempool is empty',
-            'block_full' => 'No transaction fits the block any more',
+            'block_full' => 'A side had nothing left to set, and the block is closed',
+            'passes' => 'Both sides passed again and again',
         ];
     }
 
@@ -340,6 +370,7 @@ final class BlockspaceRules implements BoardRules, DealtGame
             $position['fuse'] ? 1 : 0,
             ($position['played']['w'] ? '1' : '0').($position['played']['b'] ? '1' : '0'),
             $position['passes'],
+            $position['last'],
         ])];
 
         return [
@@ -356,7 +387,13 @@ final class BlockspaceRules implements BoardRules, DealtGame
     /** @param  Position  $position */
     private function isOver(array $position): bool
     {
-        return $position['pool'] === '' || $position['passes'] >= self::PASS_LIMIT;
+        return $position['last'] === 'x' || $position['pool'] === '' || $position['passes'] >= self::PASS_LIMIT;
+    }
+
+    /** @param  Position  $position */
+    private function inFinalRound(array $position): bool
+    {
+        return $position['last'] === 'w' || $position['last'] === 'b';
     }
 
     private function fee(string $pool, int $slot): int
@@ -445,7 +482,8 @@ final class BlockspaceRules implements BoardRules, DealtGame
     }
 
     /**
-     * A side with nothing to set is passed over, until a side can move or the game is over.
+     * A side with nothing to set is out, and the other sets its last transaction; if that side has nothing either, the
+     * block is closed.
      *
      * @param  Position  $position
      * @return Position
@@ -453,7 +491,7 @@ final class BlockspaceRules implements BoardRules, DealtGame
     private function settle(array $position): array
     {
         while (! $this->isOver($position) && $this->placementsFor($position, true) === []) {
-            $position = $this->skipped($position);
+            $position['last'] = $position['last'] === '-' ? $this->turn($position) : 'x';
         }
 
         return $position;
