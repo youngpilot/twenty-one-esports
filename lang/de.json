@@ -9010,5 +9010,5 @@
     "Enter the result now": "Ergebnis schon eintragen",
     ":side can set nothing more: :other sets one last transaction.": ":side kann nichts mehr setzen: :other setzt noch eine letzte Transaktion.",
     "Neither side has anything left to set: the block is closed.": "Keine Seite kann noch etwas setzen: Der Block ist geschlossen.",
-    "The next transaction waits under the ladder for both sides to see; the order behind it stays hidden.": "Die nächste Transaktion wartet für beide sichtbar unter der Leiter, die Reihenfolge dahinter bleibt verdeckt."
+    "The next transaction waits under the ladder for both sides to see; the order behind it stays hidden.": "Die nächste Transaktion wartet für beide sichtbar am Ende der Warteschlange, die Reihenfolge dahinter bleibt verdeckt."
 }
