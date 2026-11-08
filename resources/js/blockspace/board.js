@@ -378,19 +378,22 @@ export function mountPieceBoard(c) {
             name.textContent = SIDES[side].sign + ' ' + (side === 'w' ? c.t.white : c.t.black) + (c.color === side ? ' (' + words.you + ')' : '');
             card.classList.toggle('is-turn', active && shown.side === index);
         });
-        orderMarks.forEach((mark, index) => mark.classList.toggle('is-now', active && index === shown.ti));
+        // In the final round the order is over: the side still in sets its last transaction.
+        const finalRound = shown.last === 'w' || shown.last === 'b';
+        orderMarks.forEach((mark, index) => mark.classList.toggle('is-now', active && !finalRound && index === shown.ti));
         queueLine.textContent = words.queue.replace(':count', shown.queue);
         drawLadder(shown);
         drawNext(shown);
         const holding = !!hand && live();
         [rotateButton, mirrorButton, setButton].forEach((node) => node.setAttribute('aria-disabled', holding ? 'false' : 'true'));
         passButton.setAttribute('aria-disabled', live() ? 'false' : 'true');
-        // A side the game passed over: who, and why the other one moves again.
+        // A side this move left with nothing to set: it is out, and the other sets its last transaction.
         const record = c.shownPly > 0 ? c.state.moves?.[c.shownPly - 1]?.notation ?? '' : '';
-        const skipped = record.split(' · ').slice(1).map((note) => (note.startsWith('₿') ? c.t.white : c.t.black));
-        const skippedText = skipped.length ? (skipped.length > 1 && new Set(skipped).size === 1 ? words.skippedTwice : words.skipped).replace(':side', skipped[0]) : '';
-        const info = !c.error && (skippedText !== '' || (active && shown.passes > 0));
-        const noteText = c.error || (skippedText || (info ? words.passed : ''));
+        const out = record.split(' · ').slice(1).map((note) => (note.startsWith('₿') ? 'w' : 'b'));
+        const name = (side) => (side === 'w' ? c.t.white : c.t.black);
+        const outText = out.length > 1 ? words.outBoth : out.length ? words.out.replace(':side', name(out[0])).replace(':other', name(out[0] === 'w' ? 'b' : 'w')) : '';
+        const info = !c.error && (outText !== '' || (active && shown.passes > 0));
+        const noteText = c.error || (outText || (info ? words.passed : ''));
         if (note.textContent !== noteText) note.textContent = noteText;
         note.classList.toggle('is-info', info);
         const last = c.state.moves?.[c.shownPly - 1]?.notation;

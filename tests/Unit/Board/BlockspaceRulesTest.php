@@ -138,7 +138,7 @@ test('the game ends with the ladder empty, and the higher fees win', function ()
 
     expect($rules->outcome(blockspaceWith([], ['pool' => '', 'queue' => '', 'score' => ['w' => 40, 'b' => 39]]), []))->toBe(['result' => '1-0', 'reason' => 'mempool_empty'])
         ->and($rules->outcome(blockspaceWith([], ['pool' => '', 'queue' => '', 'score' => ['w' => 39, 'b' => 40]]), []))->toBe(['result' => '0-1', 'reason' => 'mempool_empty'])
-        ->and($rules->outcome(blockspaceWith([], ['pool' => 'a', 'passes' => 14, 'score' => ['w' => 40, 'b' => 40]]), []))->toBe(['result' => '1/2-1/2', 'reason' => 'block_full'])
+        ->and($rules->outcome(blockspaceWith([], ['pool' => 'a', 'passes' => 14, 'score' => ['w' => 40, 'b' => 40]]), []))->toBe(['result' => '1/2-1/2', 'reason' => 'passes'])
         ->and($rules->legalMoves(blockspaceWith([], ['pool' => '', 'queue' => ''])))->toBe([]);
 });
 
@@ -151,19 +151,40 @@ test('the view hides what comes next and says the rest', function () {
         ->and($view['points'])->toHaveCount(189)
         ->and($view['pieces'])->toHaveKeys(['tx0', 'tx4', 'next', 'state'])
         ->and($view['pieces']['next']['kind'])->toBe(array_keys(BlockspaceRules::FORMS)[strpos('abcdefghijklmnopqrstu', $position['queue'][0])])
-        ->and($view['pieces']['state']['kind'])->toBe('0:0:0:37:1:00:0')
+        ->and($view['pieces']['state']['kind'])->toBe('0:0:0:37:1:00:0:-')
         ->and(json_encode($view))->not->toContain($position['queue']);
 });
 
-test('the record notes every turn the game passed over, with the side', function () {
+test('a side with nothing left to set is out, and the other sets one last transaction', function () {
     $rules = new BlockspaceRules;
-    // Blue's only corners are taken: after Orange's move Blue (to move twice) has nothing to set.
+    // Blue's only corners are taken: after Orange's move Blue has nothing to set.
     $position = blockspaceWith(['a1' => 'w', 'e20' => 'b', 'd19' => 'w', 'f19' => 'w', 'd21' => 'w', 'f21' => 'w'], ['pool' => 'aaaaa', 'queue' => 'bbbbb', 'played' => ['w' => true, 'b' => true]]);
     $move = '0:b2';
+    $final = $rules->apply($position, $move);
 
     expect($rules->legalMoves($position))->toContain($move)
-        ->and($rules->notation($position, $move))->toBe('₿ I1 b2 +5 · ⚡ – · ⚡ –')
-        ->and($rules->turn($rules->apply($position, $move)))->toBe('w');
+        ->and($rules->notation($position, $move))->toBe('₿ I1 b2 +5 · ⚡ –')
+        ->and($final['last'])->toBe('b')
+        ->and($rules->turn($final))->toBe('w')
+        ->and($rules->outcome($final, []))->toBeNull()
+        // Nothing falls out any more: the ladder is whole, nothing counts as a pass.
+        ->and(strlen($final['pool']))->toBe(5)
+        ->and($final['passes'])->toBe(0);
+
+    $closed = $rules->apply($final, '0:c3');
+    expect($rules->serialize($rules->deserialize($rules->serialize($final))))->toBe($rules->serialize($final))
+        ->and($closed['last'])->toBe('x')
+        ->and($rules->legalMoves($closed))->toBe([])
+        ->and($rules->outcome($closed, []))->toBe(['result' => '1-0', 'reason' => 'block_full'])
+        // Passing the last block gives it up.
+        ->and($rules->outcome($rules->apply($final, BlockspaceRules::PASS), []))->toBe(['result' => '1-0', 'reason' => 'block_full']);
+
+    // A move that leaves neither side anything closes the block at once, and the record names both.
+    $full = blockspaceWith([], ['pool' => 'aaaaa', 'queue' => 'bbbbb', 'played' => ['w' => true, 'b' => true], 'board' => str_repeat('b', 189)]);
+    $full['board'][(21 - 1) * 9] = 'w';
+    $full['board'][(21 - 2) * 9 + 1] = '.';
+    expect($rules->notation($full, $move))->toBe('₿ I1 b2 +5 · ⚡ – · ₿ –')
+        ->and($rules->apply($full, $move)['last'])->toBe('x');
 
     // A move after which the other side can set notes nothing more.
     $open = blockspaceWith(['a1' => 'w', 'e20' => 'b'], ['pool' => 'aaaaa', 'queue' => 'bbbbb', 'played' => ['w' => true, 'b' => true]]);

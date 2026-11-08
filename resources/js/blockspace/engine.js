@@ -114,7 +114,7 @@ export function newGame(seed, fuse) {
         const j = Math.floor(r() * (i + 1));
         [deck[i], deck[j]] = [deck[j], deck[i]];
     }
-    const g = { fuse: !!fuse, deck: deck.map((tx) => letter(tx.f)).join(''), board: new Array(N).fill(0), pool: deck.slice(0, M), queue: deck.slice(M), score: [0, 0], played: [false, false], ti: 0, side: 0, moves: 0, evicted: 0, passes: 0, over: false, log: [] };
+    const g = { fuse: !!fuse, deck: deck.map((tx) => letter(tx.f)).join(''), board: new Array(N).fill(0), pool: deck.slice(0, M), queue: deck.slice(M), score: [0, 0], played: [false, false], ti: 0, side: 0, moves: 0, evicted: 0, passes: 0, last: '-', over: false, log: [] };
     settle(g);
 
     return g;
@@ -217,16 +217,23 @@ function skip(g) {
     next(g);
 }
 
-/** With nothing to place the oldest transaction drops out and the turn moves on. */
+/** Whether a side is out and the other sets its last transaction (BlockspaceRules: the final round). */
+export const inFinalRound = (g) => g.last === 'w' || g.last === 'b';
+
+/** A side with nothing to set is out and the other sets its last transaction; with nothing for that one either, the block is closed. */
 function settle(g) {
     while (!g.over) {
-        if (!g.pool.length || g.passes >= PASS_LIMIT) {
+        if (g.last === 'x' || !g.pool.length || g.passes >= PASS_LIMIT) {
             g.over = true;
 
             return;
         }
         if (moves(g, g.side, null, true).length) return;
-        skip(g);
+        g.log.push({ t: 'out', side: g.side });
+        if (g.last === '-') {
+            g.last = 'wb'[g.side];
+            g.side = 1 - g.side;
+        } else g.last = 'x';
     }
 }
 
@@ -242,12 +249,15 @@ export function play(g, i, cells) {
     g.pool.splice(i, 1);
     refill(g);
     g.log.push({ t: 'move', side: s, tx: tx.id, f: tx.f, cells: cells.slice(), gain, slot: i });
-    next(g);
+    if (inFinalRound(g)) g.last = 'x';
+    else next(g);
     settle(g);
 }
 
 export function pass(g) {
-    skip(g);
+    // Passing the last block gives it up: the block is closed.
+    if (inFinalRound(g)) g.last = 'x';
+    else skip(g);
     settle(g);
 }
 
@@ -266,15 +276,21 @@ export function positionOf(g) {
     const text = (list) => list.map((tx) => letter(tx.f)).join('') || '-';
     const board = g.board.map((v) => '.wb'[v]).join('');
 
-    return [g.fuse ? 'z' : 'n', g.ti, g.score[0], g.score[1], (g.played[0] ? '1' : '0') + (g.played[1] ? '1' : '0'), g.passes, text(g.pool), text(g.queue), g.deck, board].join(' ');
+    return [g.fuse ? 'z' : 'n', g.ti, g.score[0], g.score[1], (g.played[0] ? '1' : '0') + (g.played[1] ? '1' : '0'), g.passes, g.last, text(g.pool), text(g.queue), g.deck, board].join(' ');
 }
 
+/** The side to move: by the turn order, or in the final round the side that is still in. */
+const sideOf = (ti, last) => (last === 'w' ? 1 : last === 'b' ? 0 : ORDER[ti]);
+
 export function stateOf(position) {
-    const [fuse, ti, white, black, played, passes, pool, queue, deck, board] = position.split(' ');
+    const parts = position.split(' ');
+    // A position from before the final round has no field for it.
+    if (parts.length === 10) parts.splice(6, 0, '-');
+    const [fuse, ti, white, black, played, passes, last, pool, queue, deck, board] = parts;
     let id = 0;
     const list = (text) => (text === '-' ? [] : [...text].map((char) => ({ id: id++, f: formOf(char) })));
-    const g = { fuse: fuse === 'z', deck, board: [...board].map((char) => '.wb'.indexOf(char)), pool: list(pool), queue: list(queue), score: [Number(white), Number(black)], played: [played[0] === '1', played[1] === '1'], ti: Number(ti), side: ORDER[Number(ti)], moves: 0, evicted: 0, passes: Number(passes), over: false, log: [] };
-    g.over = !g.pool.length || g.passes >= PASS_LIMIT;
+    const g = { fuse: fuse === 'z', deck, board: [...board].map((char) => '.wb'.indexOf(char)), pool: list(pool), queue: list(queue), score: [Number(white), Number(black)], played: [played[0] === '1', played[1] === '1'], ti: Number(ti), side: sideOf(Number(ti), last), moves: 0, evicted: 0, passes: Number(passes), last, over: false, log: [] };
+    g.over = last === 'x' || !g.pool.length || g.passes >= PASS_LIMIT;
 
     return g;
 }
@@ -389,7 +405,7 @@ export function piecesOf(g) {
         pieces['tx' + rung] = { side: 'w', kind: NAMES[tx.f] };
     });
     if (g.queue.length) pieces.next = { side: 'w', kind: NAMES[g.queue[0].f] };
-    pieces.state = { side: g.side === 0 ? 'w' : 'b', kind: [g.ti, g.score[0], g.score[1], g.queue.length, g.fuse ? 1 : 0, (g.played[0] ? '1' : '0') + (g.played[1] ? '1' : '0'), g.passes].join(':') };
+    pieces.state = { side: g.side === 0 ? 'w' : 'b', kind: [g.ti, g.score[0], g.score[1], g.queue.length, g.fuse ? 1 : 0, (g.played[0] ? '1' : '0') + (g.played[1] ? '1' : '0'), g.passes, g.last].join(':') };
 
     return pieces;
 }
@@ -406,9 +422,9 @@ export function readPieces(pieces) {
         if (piece) pool.push({ f: NAMES.indexOf(piece.kind) });
     }
     const next = pieces?.next ? NAMES.indexOf(pieces.next.kind) : -1;
-    const [ti, white, black, queue, fuse, played, passes] = (pieces?.state?.kind ?? '0:0:0:0:0:00:0').split(':');
+    const [ti, white, black, queue, fuse, played, passes, last = '-'] = (pieces?.state?.kind ?? '0:0:0:0:0:00:0:-').split(':');
 
-    return { board, pool, score: [Number(white), Number(black)], ti: Number(ti), side: ORDER[Number(ti)], queue: Number(queue), fuse: fuse === '1', played: [played[0] === '1', played[1] === '1'], passes: Number(passes), next };
+    return { board, pool, score: [Number(white), Number(black)], ti: Number(ti), side: sideOf(Number(ti), last), queue: Number(queue), fuse: fuse === '1', played: [played[0] === '1', played[1] === '1'], passes: Number(passes), last, next };
 }
 
 /** Plays a move in the league's text; false for text that is none, or a placement the rules refuse. */
@@ -437,17 +453,11 @@ export function notationOf(g, text) {
     return sign + ' ' + NAMES[g.pool[Number(slot)].f] + ' ' + names.split(',')[0] + ' +' + fee(g, Number(slot)) + passedOver(g, text);
 }
 
-/** The turns the game passes over after this move, ` · ⚡ –` for each side that has nothing to set (BlockspaceRules). */
+/** The sides this move leaves with nothing to set, ` · ⚡ –` for each: the final round begins (BlockspaceRules). */
 function passedOver(g, text) {
+    if (g.last !== '-') return '';
     const next = clone(g);
     applyMove(next, text);
-    const forced = next.passes - (text === 'pass' ? g.passes + 1 : 0);
-    let turn = (g.ti + 1) % 4;
-    let notes = '';
-    for (let skip = 0; skip < forced; skip++) {
-        notes += ' · ' + SIGNS[ORDER[turn]] + ' –';
-        turn = (turn + 1) % 4;
-    }
 
-    return notes;
+    return next.log.filter((entry) => entry.t === 'out').map((entry) => ' · ' + SIGNS[entry.side] + ' –').join('');
 }
