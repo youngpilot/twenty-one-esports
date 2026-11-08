@@ -14,6 +14,8 @@ export const M = 5;
 export const BONUS = [4, 3, 2, 1, 0];
 export const ORDER = [0, 1, 1, 0];
 export const PASS_LIMIT = 14;
+/** The transactions anyone sees behind the ladder (BlockspaceRules::VISIBLE). */
+export const VISIBLE = 5;
 
 const SHAPES = {
     I1: [[0, 0]], I2: [[0, 0], [0, 1]], I3: [[0, 0], [0, 1], [0, 2]], L3: [[0, 0], [1, 0], [1, 1]],
@@ -138,15 +140,6 @@ function marks(g, s) {
     return { edge, anc };
 }
 
-/** The free corners of side `s`: empty cells at a corner of its stones and along no edge, where a new transaction can start. */
-export function freeCorners(g, s) {
-    const m = marks(g, s);
-    let count = 0;
-    for (let i = 0; i < N; i++) if (m.anc[i] && !m.edge[i] && !g.board[i]) count++;
-
-    return count;
-}
-
 /** Why these cells may not be set for side `s`: 'taken', 'edge', 'corner' or 'start'; null when they may. */
 export function refuse(g, s, cells) {
     const m = marks(g, s);
@@ -229,13 +222,10 @@ function skip(g) {
 /** Whether a side is out and the other sets its last transaction (BlockspaceRules: the final round). */
 export const inFinalRound = (g) => g.last === 'w' || g.last === 'b';
 
-/** Whether the block is closed: by the final round (`W`, `B` for the side that was out) or with both sides out at once (`x`). */
-const closed = (g) => g.last === 'x' || g.last === 'W' || g.last === 'B';
-
 /** A side with nothing to set is out and the other sets its last transaction; with nothing for that one either, the block is closed. */
 function settle(g) {
     while (!g.over) {
-        if (closed(g) || !g.pool.length || g.passes >= PASS_LIMIT) {
+        if (g.last === 'x' || !g.pool.length || g.passes >= PASS_LIMIT) {
             g.over = true;
 
             return;
@@ -261,20 +251,19 @@ export function play(g, i, cells) {
     g.pool.splice(i, 1);
     refill(g);
     g.log.push({ t: 'move', side: s, tx: tx.id, f: tx.f, cells: cells.slice(), gain, slot: i });
-    if (inFinalRound(g)) g.last = g.last.toUpperCase();
+    if (inFinalRound(g)) g.last = 'x';
     else next(g);
     settle(g);
 }
 
 export function pass(g) {
     // Passing the last block gives it up: the block is closed.
-    if (inFinalRound(g)) g.last = g.last.toUpperCase();
+    if (inFinalRound(g)) g.last = 'x';
     else skip(g);
     settle(g);
 }
 
-/** The higher yield wins; on an equal yield the side that was not shut in, so a draw needs both out at once (BlockspaceRules). */
-export const winner = (g) => (g.score[0] > g.score[1] ? 0 : g.score[1] > g.score[0] ? 1 : 'wW'.includes(g.last) ? 1 : 'bB'.includes(g.last) ? 0 : -1);
+export const winner = (g) => (g.score[0] > g.score[1] ? 0 : g.score[1] > g.score[0] ? 1 : -1);
 export const clone = (g) => ({ ...g, board: g.board.slice(), pool: g.pool.slice(), queue: g.queue.slice(), score: g.score.slice(), played: g.played.slice(), log: [] });
 
 /* The position text and the moves of BlockspaceRules. */
@@ -303,7 +292,7 @@ export function stateOf(position) {
     let id = 0;
     const list = (text) => (text === '-' ? [] : [...text].map((char) => ({ id: id++, f: formOf(char) })));
     const g = { fuse: fuse === 'z', deck, board: [...board].map((char) => '.wb'.indexOf(char)), pool: list(pool), queue: list(queue), score: [Number(white), Number(black)], played: [played[0] === '1', played[1] === '1'], ti: Number(ti), side: sideOf(Number(ti), last), moves: 0, evicted: 0, passes: Number(passes), last, over: false, log: [] };
-    g.over = closed(g) || !g.pool.length || g.passes >= PASS_LIMIT;
+    g.over = last === 'x' || !g.pool.length || g.passes >= PASS_LIMIT;
 
     return g;
 }
@@ -390,9 +379,9 @@ export function think(g, level, r, budget) {
         const q = top[i++ % top.length];
         const h = clone(g);
         // What comes next is hidden from the bot as well: every look ahead gets an order of its own.
-        // The next one is public and stays first.
-        for (let k = h.queue.length - 1; k > 1; k--) {
-            const j = 1 + Math.floor(r() * k);
+        // The next five are public and stay in place.
+        for (let k = h.queue.length - 1; k > VISIBLE; k--) {
+            const j = VISIBLE + Math.floor(r() * (k - VISIBLE + 1));
             [h.queue[k], h.queue[j]] = [h.queue[j], h.queue[k]];
         }
         play(h, q.m.i, q.m.cells);
@@ -417,7 +406,9 @@ export function piecesOf(g) {
     g.pool.forEach((tx, rung) => {
         pieces['tx' + rung] = { side: 'w', kind: NAMES[tx.f] };
     });
-    if (g.queue.length) pieces.next = { side: 'w', kind: NAMES[g.queue[0].f] };
+    g.queue.slice(0, VISIBLE).forEach((tx, place) => {
+        pieces['next' + place] = { side: 'w', kind: NAMES[tx.f] };
+    });
     pieces.state = { side: g.side === 0 ? 'w' : 'b', kind: [g.ti, g.score[0], g.score[1], g.queue.length, g.fuse ? 1 : 0, (g.played[0] ? '1' : '0') + (g.played[1] ? '1' : '0'), g.passes, g.last].join(':') };
 
     return pieces;
@@ -434,7 +425,11 @@ export function readPieces(pieces) {
         const piece = pieces?.['tx' + rung];
         if (piece) pool.push({ f: NAMES.indexOf(piece.kind) });
     }
-    const next = pieces?.next ? NAMES.indexOf(pieces.next.kind) : -1;
+    const next = [];
+    for (let place = 0; place < VISIBLE; place++) {
+        const piece = pieces?.['next' + place];
+        if (piece) next.push(NAMES.indexOf(piece.kind));
+    }
     const [ti, white, black, queue, fuse, played, passes, last = '-'] = (pieces?.state?.kind ?? '0:0:0:0:0:00:0:-').split(':');
 
     return { board, pool, score: [Number(white), Number(black)], ti: Number(ti), side: sideOf(Number(ti), last), queue: Number(queue), fuse: fuse === '1', played: [played[0] === '1', played[1] === '1'], passes: Number(passes), last, next };

@@ -149,8 +149,9 @@ test('the view hides what comes next and says the rest', function () {
 
     expect($view['input'])->toBe('pieces')
         ->and($view['points'])->toHaveCount(189)
-        ->and($view['pieces'])->toHaveKeys(['tx0', 'tx4', 'next', 'state'])
-        ->and($view['pieces']['next']['kind'])->toBe(array_keys(BlockspaceRules::FORMS)[strpos('abcdefghijklmnopqrstu', $position['queue'][0])])
+        ->and($view['pieces'])->toHaveKeys(['tx0', 'tx4', 'next0', 'next4', 'state'])
+        ->and($view['pieces'])->not->toHaveKey('next5')
+        ->and($view['pieces']['next4']['kind'])->toBe(array_keys(BlockspaceRules::FORMS)[strpos('abcdefghijklmnopqrstu', $position['queue'][4])])
         ->and($view['pieces']['state']['kind'])->toBe('0:0:0:37:1:00:0:-')
         ->and(json_encode($view))->not->toContain($position['queue']);
 });
@@ -173,7 +174,7 @@ test('a side with nothing left to set is out, and the other sets one last transa
 
     $closed = $rules->apply($final, '0:c3');
     expect($rules->serialize($rules->deserialize($rules->serialize($final))))->toBe($rules->serialize($final))
-        ->and($closed['last'])->toBe('B')
+        ->and($closed['last'])->toBe('x')
         ->and($rules->legalMoves($closed))->toBe([])
         ->and($rules->outcome($closed, []))->toBe(['result' => '1-0', 'reason' => 'block_full'])
         // Passing the last block gives it up.
@@ -191,26 +192,17 @@ test('a side with nothing left to set is out, and the other sets one last transa
     expect($rules->notation($open, $move))->toBe('₿ I1 b2 +5');
 });
 
-test('on an equal yield the side that was not shut in wins, a draw needs both out at once', function () {
-    $rules = new BlockspaceRules;
-    $even = ['pool' => 'a', 'score' => ['w' => 40, 'b' => 40]];
-
-    expect($rules->outcome(blockspaceWith([], [...$even, 'last' => 'B']), []))->toBe(['result' => '1-0', 'reason' => 'block_full'])
-        ->and($rules->outcome(blockspaceWith([], [...$even, 'last' => 'W']), []))->toBe(['result' => '0-1', 'reason' => 'block_full'])
-        ->and($rules->outcome(blockspaceWith([], [...$even, 'last' => 'x']), []))->toBe(['result' => '1/2-1/2', 'reason' => 'block_full'])
-        // The higher yield still comes first.
-        ->and($rules->outcome(blockspaceWith([], ['pool' => 'a', 'score' => ['w' => 39, 'b' => 40], 'last' => 'B']), []))->toBe(['result' => '0-1', 'reason' => 'block_full'])
-        ->and($rules->serialize(blockspaceWith([], ['last' => 'W'])))->toContain(' 0 W ');
-});
-
-test('anyone may know the next transaction, nobody the order behind it', function () {
+test('anyone may know the next five transactions, nobody the order behind them', function () {
     $rules = new BlockspaceRules;
     $position = $rules->deal('rapid');
     $public = $rules->withoutHidden($position);
 
-    expect($public['queue'][0])->toBe($position['queue'][0])
-        ->and(substr($public['queue'], 1))->toBe(str_repeat('a', strlen($position['queue']) - 1))
-        ->and($public['deck'])->toBe(str_repeat('a', 42));
+    expect(substr($public['queue'], 0, 5))->toBe(substr($position['queue'], 0, 5))
+        ->and(substr($public['queue'], 5))->toBe(str_repeat('a', strlen($position['queue']) - 5))
+        ->and($public['deck'])->toBe(str_repeat('a', 42))
+        // With five or fewer to come nothing is hidden, and a move can be taken back again.
+        ->and($rules->revealsOnMove($position))->toBeTrue()
+        ->and($rules->revealsOnMove([...$position, 'queue' => substr($position['queue'], 0, 5)]))->toBeFalse();
 });
 
 test('text that is no position or move is refused', function () {

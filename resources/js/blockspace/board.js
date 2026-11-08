@@ -12,7 +12,7 @@
  */
 // board.css comes with boardGame.js: as a dependency of this lazily loaded module it kept the import pending (see there).
 import { setFocus } from '../focusMode.js';
-import { BONUS, C, N, NAMES, ORDER, ORI, R, SIZE, START, cellName, cellOf, flip, freeCorners, key, moveText, readPieces, refuse, rot } from './engine.js';
+import { BONUS, C, N, NAMES, ORDER, ORI, R, SIZE, START, cellName, cellOf, flip, key, moveText, moves, readPieces, refuse, rot } from './engine.js';
 import { CELL, SIDES, element, form, joints, stone, stoneDefs } from './stones.js';
 
 /** A block's colour by what it pays, from a cheap green to a rich magenta, as a fee explorer shows the mempool. */
@@ -20,6 +20,8 @@ const FEE_COLOURS = { 1: '#0A6B3D', 2: '#0A6B3D', 3: '#1F7433', 4: '#4C7A1C', 5:
 const LONG_PRESS_MS = 340;
 const PASS_CONFIRM_MS = 3000;
 const PASS_CONFIRM_MIN_MS = 250;
+// From so many ways to set a transaction down, a side's card warns: the side that gets shut in had a median of 8, 6 and 1 in its last three turns (bots, 2026-11-09).
+const ROOM_WARNING = 10;
 /** The cell in px below which the page scrolls to the block, and the largest one. */
 const COMFORTABLE_CELL = 27;
 /** On a phone: how far the stage reaches into the page's margin, the gap beside the block, and the narrowest folded ladder, in px. */
@@ -210,13 +212,13 @@ export function mountPieceBoard(c) {
         const name = html('span', '');
         const unit = html('small', '', 'sat');
         const clock = html('time', 'bsp-clock');
-        // The free corners: where the yield lies ahead. A side with none left is out, so the count says who is winning the room.
-        const corners = html('em', 'bsp-corners');
-        corners.dataset.test = 'corners-' + side;
-        corners.title = words.cornersTitle;
-        card.append(name, value, unit, clock, corners);
+        // A warning, only when it gets tight: how many ways this side has left to set a transaction of the ladder.
+        const room = html('em', 'bsp-room');
+        room.dataset.test = 'room-' + side;
+        room.title = words.roomTitle;
+        card.append(name, value, unit, clock, room);
 
-        return { card, value, name, side, clock, corners };
+        return { card, value, name, side, clock, room };
     });
     const order = html('div', 'bsp-order');
     const marks = html('div', 'bsp-marks');
@@ -241,9 +243,11 @@ export function mountPieceBoard(c) {
     const nextSlot = html('div', 'bsp-next');
     nextSlot.dataset.test = 'ladder-next';
     nextSlot.setAttribute('role', 'note');
-    const nextPicture = element('svg', { 'aria-hidden': 'true' });
-    const nextSize = html('span', 'bsp-next-size');
-    nextSlot.append(html('span', 'bsp-next-label', words.next), nextPicture, nextSize);
+    const nextForms = html('span', 'bsp-next-forms');
+    nextForms.setAttribute('aria-hidden', 'true');
+    // No words in the row: five forms need its width. The dashed row under the ladder says "waiting", the title says what.
+    nextSlot.title = words.next;
+    nextSlot.append(nextForms);
     ladder.append(fold, nextSlot);
 
     const note = html('p', 'bsp-note');
@@ -306,17 +310,23 @@ export function mountPieceBoard(c) {
     }
 
     /** The transaction to come next, small under the ladder: everyone sees it, nobody can take it yet. */
+    /** The next five transactions, the next block, in the order they come in; all at one scale, so their sizes compare. */
     function drawNext(g) {
-        nextSlot.hidden = g.next < 0;
-        if (g.next < 0 || nextSlot.dataset.form === NAMES[g.next]) return;
-        nextSlot.dataset.form = NAMES[g.next];
-        const shape = ORI[g.next][flatOf(g.next)];
-        const height = Math.max(...shape.map((part) => part[0])) + 1;
-        const width = Math.max(...shape.map((part) => part[1])) + 1;
-        nextPicture.setAttribute('viewBox', `0 0 ${width * CELL} ${height * CELL}`);
-        nextPicture.replaceChildren(form('tx', shape));
-        nextSize.textContent = SIZE[g.next] + ' vB';
-        nextSlot.setAttribute('aria-label', words.next + ': ' + NAMES[g.next] + ', ' + SIZE[g.next] + ' vB');
+        nextSlot.hidden = !g.next.length;
+        const forms = g.next.map((f) => NAMES[f]).join(' ');
+        if (!g.next.length || nextSlot.dataset.forms === forms) return;
+        nextSlot.dataset.forms = forms;
+        nextForms.replaceChildren(...g.next.map((f) => {
+            const shape = ORI[f][flatOf(f)];
+            const height = Math.max(...shape.map((part) => part[0])) + 1;
+            const width = Math.max(...shape.map((part) => part[1])) + 1;
+            const picture = element('svg', { viewBox: `0 0 ${width * CELL} ${height * CELL}` });
+            picture.style.setProperty('--rows', height);
+            picture.append(form('tx', shape));
+
+            return picture;
+        }));
+        nextSlot.setAttribute('aria-label', words.next + ': ' + g.next.map((f) => NAMES[f] + ' (' + SIZE[f] + ' vB)').join(', '));
     }
 
     /** One element per transaction, matched by form and order: what is taken leaves, the rest moves up a rung. */
@@ -377,12 +387,11 @@ export function mountPieceBoard(c) {
             group.classList.toggle('is-due', active && shown.side === index && !shown.played[index]);
             group.style.display = shown.played[index] ? 'none' : '';
         });
-        feeOf.forEach(({ card, value, name, side, corners }, index) => {
+        feeOf.forEach(({ card, value, name, side, room }, index) => {
             value.textContent = shown.score[index];
-            // Shown once a side has set its first stones; before, its start cell is its only corner.
-            const free = shown.played[index] ? freeCorners(shown, index) : null;
-            corners.textContent = free === null ? '' : free === 1 ? words.corner : words.corners.replace(':count', free);
-            corners.classList.toggle('is-low', free !== null && free <= 2);
+            // A side is shut in when nothing of the ladder fits any more: from ROOM_WARNING ways down the count shows.
+            const left = active && shown.played[index] ? moves(shown, index).length : null;
+            room.textContent = left === null || left > ROOM_WARNING ? '' : left === 1 ? words.roomOne : words.room.replace(':count', left);
             name.textContent = SIDES[side].sign + ' ' + (side === 'w' ? c.t.white : c.t.black) + (c.color === side ? ' (' + words.you + ')' : '');
             card.classList.toggle('is-turn', active && shown.side === index);
         });

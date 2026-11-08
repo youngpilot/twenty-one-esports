@@ -110,19 +110,19 @@
 
 .bsp-clock:empty { display: none; }
 
-/* The free corners, under the yield; few of them turn red: that side is about to be shut in. */
-.bsp-corners {
+/* Under the yield, only when it gets tight: how many ways that side has left before it is shut in. */
+.bsp-room {
     grid-area: 2 / 1 / 2 / 4;
     justify-self: end;
-    font-style: normal;
-    color: var(--color-ink-3);
+    color: var(--color-loss);
     font-size: 12px;
+    font-style: normal;
     font-variant-numeric: tabular-nums;
+    font-weight: 700;
     line-height: 1;
 }
 
-.bsp-corners:empty { display: none; }
-.bsp-corners.is-low { color: var(--color-loss); font-weight: 700; }
+.bsp-room:empty { display: none; }
 .bsp-clock.is-running { color: var(--color-ink); font-weight: 700; }
 
 /* The other side mirrors it: its fee stands next to the middle, its name outside. */
@@ -131,7 +131,7 @@
 .bsp-fee.is-b small { grid-area: 1 / 2; }
 .bsp-fee.is-b span { grid-area: 1 / 3; justify-self: end; }
 .bsp-fee.is-b .bsp-clock { justify-self: end; text-align: right; }
-.bsp-fee.is-b .bsp-corners { justify-self: start; }
+.bsp-fee.is-b .bsp-room { justify-self: start; }
 .bsp-fee.is-w.is-turn { border-color: var(--bs-w); color: var(--color-ink); }
 .bsp-fee.is-b.is-turn { border-color: var(--bs-b); color: var(--color-ink); }
 
@@ -265,7 +265,7 @@
     font-variant-numeric: tabular-nums;
 }
 
-/* The next transaction: the last row of the ladder, dashed, as a block still waiting. */
+/* The next five transactions: the last row of the ladder, dashed, as the block still waiting. */
 .bsp-next {
     position: absolute;
     right: 0;
@@ -284,9 +284,9 @@
 }
 
 .bsp-next[hidden] { display: none; }
-.bsp-next svg { height: 70%; width: auto; max-width: 50%; opacity: 0.85; }
-.bsp-next-label { font-weight: 700; }
-.bsp-next-size { margin-left: auto; color: var(--color-ink-3); }
+/* One scale for all five: a cell is the same size in each, so a big transaction looks big. */
+.bsp-next-forms { display: flex; flex: 1; align-items: center; gap: 4px; min-width: 0; overflow: hidden; }
+.bsp-next-forms svg { flex: 0 1 auto; min-width: 0; width: auto; height: calc(var(--u) * 0.24 * var(--rows)); opacity: 0.85; }
 
 /* The fuse: a line that burns away along the oldest. */
 .bsp-fuse {
@@ -381,7 +381,7 @@
     .is-compact .bsp-row { position: relative; justify-content: center; gap: 8px; }
     .is-compact .bsp-ladder { --lu: var(--strip-unit); --bs-depth: 4px; width: var(--strip); }
     .is-compact .bsp-ladder:not(.is-open) .bsp-next { padding-inline: 4px; gap: 3px; }
-    .is-compact .bsp-ladder:not(.is-open) .bsp-next-size { display: none; }
+    .is-compact .bsp-ladder:not(.is-open) .bsp-next-forms svg:nth-child(n + 4) { display: none; }
     .is-compact .bsp-ladder::before { left: -5px; }
     .is-compact .bsp-help { display: none; }
     .is-compact .bsp-button { padding-inline: 2px; }

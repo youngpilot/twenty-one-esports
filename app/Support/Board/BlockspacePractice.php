@@ -89,10 +89,10 @@ final class BlockspacePractice
         [
             'id' => 'endgame', 'stones' => ['w' => 'd21,f21,d18,b4,c3', 'b' => 'e20,e19'], 'pool' => 'dhcbj', 'queue' => 'gbhe', 'played' => '11', 'score' => ['w' => 40, 'b' => 43], 'goal' => 'shut',
             'title' => 'Close the block',
-            'text' => 'The end of a real game. It is over when a side has nothing left to set: that side is out, the other sets one last transaction and the block is closed. Blue leads by 3, but has a single free corner left, the counter under its yield shows it. On an equal yield the side that was not shut in wins.',
+            'text' => 'The end of a real game. It is over when a side has nothing left to set: that side is out, the other sets one last transaction and the block is closed. Blue leads by 3, but its stones have a single free corner left.',
             'task' => 'Take Blue\'s last corner.',
             'done' => 'Blue is out, and your last transaction closes the block. Shutting the other miner in is how Blockspace is won. Now try the bots, or find a real opponent in the lobby.',
-            'retry' => 'Blue still has a corner. Look at the counter under its yield and set a transaction on that cell.',
+            'retry' => 'Blue still has a corner: f18, at the corner of its stones. Set a transaction there.',
         ],
     ];
 
@@ -145,10 +145,10 @@ final class BlockspacePractice
             'passed' => __('The last turn was passed: the oldest transaction fell out.'),
             'out' => __(':side can set nothing more: :other sets one last transaction.'),
             'outBoth' => __('Neither side has anything left to set: the block is closed.'),
-            'corner' => __('1 corner'),
-            'corners' => __(':count corners'),
-            'cornersTitle' => __('Free corners: cells where this side can start a new transaction. A side with none left is out.'),
-            'next' => __('Next'),
+            'roomOne' => __('1 way left'),
+            'room' => __(':count ways left'),
+            'roomTitle' => __('So many ways this side has left to set a transaction of the ladder. With none left it is out.'),
+            'next' => __('Coming up'),
             'chat' => __('Chat'),
             'unfoldLadder' => __('Open the mempool'),
             'foldLadder' => __('Close the mempool'),
