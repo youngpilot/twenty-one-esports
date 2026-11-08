@@ -138,6 +138,15 @@ function marks(g, s) {
     return { edge, anc };
 }
 
+/** The free corners of side `s`: empty cells at a corner of its stones and along no edge, where a new transaction can start. */
+export function freeCorners(g, s) {
+    const m = marks(g, s);
+    let count = 0;
+    for (let i = 0; i < N; i++) if (m.anc[i] && !m.edge[i] && !g.board[i]) count++;
+
+    return count;
+}
+
 /** Why these cells may not be set for side `s`: 'taken', 'edge', 'corner' or 'start'; null when they may. */
 export function refuse(g, s, cells) {
     const m = marks(g, s);
@@ -220,10 +229,13 @@ function skip(g) {
 /** Whether a side is out and the other sets its last transaction (BlockspaceRules: the final round). */
 export const inFinalRound = (g) => g.last === 'w' || g.last === 'b';
 
+/** Whether the block is closed: by the final round (`W`, `B` for the side that was out) or with both sides out at once (`x`). */
+const closed = (g) => g.last === 'x' || g.last === 'W' || g.last === 'B';
+
 /** A side with nothing to set is out and the other sets its last transaction; with nothing for that one either, the block is closed. */
 function settle(g) {
     while (!g.over) {
-        if (g.last === 'x' || !g.pool.length || g.passes >= PASS_LIMIT) {
+        if (closed(g) || !g.pool.length || g.passes >= PASS_LIMIT) {
             g.over = true;
 
             return;
@@ -249,19 +261,20 @@ export function play(g, i, cells) {
     g.pool.splice(i, 1);
     refill(g);
     g.log.push({ t: 'move', side: s, tx: tx.id, f: tx.f, cells: cells.slice(), gain, slot: i });
-    if (inFinalRound(g)) g.last = 'x';
+    if (inFinalRound(g)) g.last = g.last.toUpperCase();
     else next(g);
     settle(g);
 }
 
 export function pass(g) {
     // Passing the last block gives it up: the block is closed.
-    if (inFinalRound(g)) g.last = 'x';
+    if (inFinalRound(g)) g.last = g.last.toUpperCase();
     else skip(g);
     settle(g);
 }
 
-export const winner = (g) => (g.score[0] > g.score[1] ? 0 : g.score[1] > g.score[0] ? 1 : -1);
+/** The higher yield wins; on an equal yield the side that was not shut in, so a draw needs both out at once (BlockspaceRules). */
+export const winner = (g) => (g.score[0] > g.score[1] ? 0 : g.score[1] > g.score[0] ? 1 : 'wW'.includes(g.last) ? 1 : 'bB'.includes(g.last) ? 0 : -1);
 export const clone = (g) => ({ ...g, board: g.board.slice(), pool: g.pool.slice(), queue: g.queue.slice(), score: g.score.slice(), played: g.played.slice(), log: [] });
 
 /* The position text and the moves of BlockspaceRules. */
@@ -290,7 +303,7 @@ export function stateOf(position) {
     let id = 0;
     const list = (text) => (text === '-' ? [] : [...text].map((char) => ({ id: id++, f: formOf(char) })));
     const g = { fuse: fuse === 'z', deck, board: [...board].map((char) => '.wb'.indexOf(char)), pool: list(pool), queue: list(queue), score: [Number(white), Number(black)], played: [played[0] === '1', played[1] === '1'], ti: Number(ti), side: sideOf(Number(ti), last), moves: 0, evicted: 0, passes: Number(passes), last, over: false, log: [] };
-    g.over = last === 'x' || !g.pool.length || g.passes >= PASS_LIMIT;
+    g.over = closed(g) || !g.pool.length || g.passes >= PASS_LIMIT;
 
     return g;
 }

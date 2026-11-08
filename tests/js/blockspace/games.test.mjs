@@ -49,6 +49,13 @@ test('the record notes the side that is out, as the server writes it', () => {
     const closed = stateOf(['n', 0, 0, 0, '11', 0, '-', 'aaaaa', 'bbbbb', 'aabbccddeeffgghhiijjkkllmmnnooppqqrrssttuu', full.join('')].join(' '));
     assert.equal(notationOf(closed, '0:b2'), '₿ I1 b2 +5 · ⚡ – · ₿ –');
 
+    // On an equal yield the side that was not shut in wins; with both out at once it is a draw.
+    const even = (last) => stateOf(['n', 0, 40, 40, '11', 0, last, 'a', '-', 'aabbccddeeffgghhiijjkkllmmnnooppqqrrssttuu', board.join('')].join(' '));
+    assert.equal(winner(even('B')), 0);
+    assert.equal(winner(even('W')), 1);
+    assert.equal(winner(even('x')), -1);
+    assert.ok(even('B').over);
+
     // A position written before the final round still reads.
     assert.equal(stateOf(['n', 0, 0, 0, '11', 0, 'aaaaa', 'bbbbb', 'aabbccddeeffgghhiijjkkllmmnnooppqqrrssttuu', board.join('')].join(' ')).last, '-');
 });

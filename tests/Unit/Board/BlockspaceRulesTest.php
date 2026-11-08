@@ -173,7 +173,7 @@ test('a side with nothing left to set is out, and the other sets one last transa
 
     $closed = $rules->apply($final, '0:c3');
     expect($rules->serialize($rules->deserialize($rules->serialize($final))))->toBe($rules->serialize($final))
-        ->and($closed['last'])->toBe('x')
+        ->and($closed['last'])->toBe('B')
         ->and($rules->legalMoves($closed))->toBe([])
         ->and($rules->outcome($closed, []))->toBe(['result' => '1-0', 'reason' => 'block_full'])
         // Passing the last block gives it up.
@@ -189,6 +189,18 @@ test('a side with nothing left to set is out, and the other sets one last transa
     // A move after which the other side can set notes nothing more.
     $open = blockspaceWith(['a1' => 'w', 'e20' => 'b'], ['pool' => 'aaaaa', 'queue' => 'bbbbb', 'played' => ['w' => true, 'b' => true]]);
     expect($rules->notation($open, $move))->toBe('₿ I1 b2 +5');
+});
+
+test('on an equal yield the side that was not shut in wins, a draw needs both out at once', function () {
+    $rules = new BlockspaceRules;
+    $even = ['pool' => 'a', 'score' => ['w' => 40, 'b' => 40]];
+
+    expect($rules->outcome(blockspaceWith([], [...$even, 'last' => 'B']), []))->toBe(['result' => '1-0', 'reason' => 'block_full'])
+        ->and($rules->outcome(blockspaceWith([], [...$even, 'last' => 'W']), []))->toBe(['result' => '0-1', 'reason' => 'block_full'])
+        ->and($rules->outcome(blockspaceWith([], [...$even, 'last' => 'x']), []))->toBe(['result' => '1/2-1/2', 'reason' => 'block_full'])
+        // The higher yield still comes first.
+        ->and($rules->outcome(blockspaceWith([], ['pool' => 'a', 'score' => ['w' => 39, 'b' => 40], 'last' => 'B']), []))->toBe(['result' => '0-1', 'reason' => 'block_full'])
+        ->and($rules->serialize(blockspaceWith([], ['last' => 'W'])))->toContain(' 0 W ');
 });
 
 test('anyone may know the next transaction, nobody the order behind it', function () {

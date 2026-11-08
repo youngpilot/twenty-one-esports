@@ -9,18 +9,15 @@ namespace App\Support\Board;
  * tests/Unit/Board/BlockspaceRulesTest.php holds to the server's rules, and tests/Feature/BlockspacePracticeTest.php
  * holds every lesson to its goal.
  *
- * @phpstan-type Lesson array{id: string, stones?: array{w?: string, b?: string}, pool?: string, queue?: string, ti?: int, score?: array{w: int, b: int}, played?: string, fuse?: bool, position?: string, goal: 'place'|'touch'|'fee'|'slot'|'pass'|'win', count?: int, slot?: int, title: string, text: string, task: string, done: string, retry: string}
+ * @phpstan-type Lesson array{id: string, stones?: array{w?: string, b?: string}, pool?: string, queue?: string, ti?: int, score?: array{w: int, b: int}, played?: string, fuse?: bool, position?: string, goal: 'place'|'touch'|'fee'|'slot'|'pass'|'shut'|'win', count?: int, slot?: int, title: string, text: string, task: string, done: string, retry: string}
  */
 final class BlockspacePractice
 {
-    /** The last lesson: 3 sats behind with six transactions left, from a game of the bots. */
-    private const ENDGAME = 'n 0 85 88 11 0 - rofie p dmqnmbeanrkqlitgsgbjulctkhhpcufjsorofaidep .b.www.w..bbwbbbw..b.bwwb.w..bb.wbww..bb.wwbw.bwwb.bbw.b.wbb.wb.bw..bbwb.bwb...wb.bwb..wwbbwbbww..bbw.bwwwb.bwwwb..w.bb.bb.ww....b.bw...wwwwbw..w..bbwbbbwwbbwwbw.wbwbwbwww.ww.wb.w...ww.b...';
-
     /**
      * The lessons, in order. A lesson is a position with the player as Orange (the rules' White) to move, built from `stones`, `pool` and
      * `queue` (forms as in BlockspaceRules, a = I1 … u = Z5) or given whole, and what the player has to do there:
      * `place` `count` transactions, `touch` a Blue stone along an edge, take the highest `fee`, the transaction on
-     * rung `slot`, `pass`, or `win` the game against the Hodler.
+     * rung `slot`, `pass`, `shut` the other side in, or `win` the game against the Hodler.
      *
      * @var list<Lesson>
      */
@@ -90,12 +87,12 @@ final class BlockspacePractice
             'retry' => 'That one was not the oldest. It has burned now.',
         ],
         [
-            'id' => 'endgame', 'position' => self::ENDGAME, 'goal' => 'win',
+            'id' => 'endgame', 'stones' => ['w' => 'd21,f21,d18,b4,c3', 'b' => 'e20,e19'], 'pool' => 'dhcbj', 'queue' => 'gbhe', 'played' => '11', 'score' => ['w' => 40, 'b' => 43], 'goal' => 'shut',
             'title' => 'Close the block',
-            'text' => 'The end of a real game. It is over when the ladder is empty, or when a side has nothing left to set: that side is out, the other sets one last transaction and the block is closed. The higher yield wins. You are 3 behind and six transactions are left.',
-            'task' => 'Win the game against the Hodler.',
-            'done' => 'That is Blockspace. Now try the bots, or find a real opponent in the lobby.',
-            'retry' => 'The Hodler stayed ahead. Count the yield and start again.',
+            'text' => 'The end of a real game. It is over when a side has nothing left to set: that side is out, the other sets one last transaction and the block is closed. Blue leads by 3, but has a single free corner left, the counter under its yield shows it. On an equal yield the side that was not shut in wins.',
+            'task' => 'Take Blue\'s last corner.',
+            'done' => 'Blue is out, and your last transaction closes the block. Shutting the other miner in is how Blockspace is won. Now try the bots, or find a real opponent in the lobby.',
+            'retry' => 'Blue still has a corner. Look at the counter under its yield and set a transaction on that cell.',
         ],
     ];
 
@@ -148,6 +145,9 @@ final class BlockspacePractice
             'passed' => __('The last turn was passed: the oldest transaction fell out.'),
             'out' => __(':side can set nothing more: :other sets one last transaction.'),
             'outBoth' => __('Neither side has anything left to set: the block is closed.'),
+            'corner' => __('1 corner'),
+            'corners' => __(':count corners'),
+            'cornersTitle' => __('Free corners: cells where this side can start a new transaction. A side with none left is out.'),
             'next' => __('Next'),
             'chat' => __('Chat'),
             'unfoldLadder' => __('Open the mempool'),

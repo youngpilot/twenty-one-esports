@@ -8,6 +8,8 @@ import { C, cellOf, fee, moves } from './engine.js';
 export function lessonVerdict(lesson, before, after, move, placed) {
     if (lesson.goal === 'pass') return move === 'pass' ? 'done' : 'retry';
     if (move === 'pass') return 'retry';
+    // Blue has nothing left to set after the move: it is out, the final round has begun.
+    if (lesson.goal === 'shut') return after.last === 'b' ? 'done' : 'retry';
     const [slot, names] = move.split(':');
     const cells = names.split(',').map(cellOf);
     if (lesson.goal === 'slot') return Number(slot) === lesson.slot ? 'done' : 'retry';

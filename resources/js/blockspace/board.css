@@ -101,6 +101,7 @@
 
 .bsp-clock {
     grid-area: 2 / 1 / 2 / 4;
+    justify-self: start;
     color: var(--color-ink-3);
     font-size: 12px;
     font-variant-numeric: tabular-nums;
@@ -108,6 +109,20 @@
 }
 
 .bsp-clock:empty { display: none; }
+
+/* The free corners, under the yield; few of them turn red: that side is about to be shut in. */
+.bsp-corners {
+    grid-area: 2 / 1 / 2 / 4;
+    justify-self: end;
+    font-style: normal;
+    color: var(--color-ink-3);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.bsp-corners:empty { display: none; }
+.bsp-corners.is-low { color: var(--color-loss); font-weight: 700; }
 .bsp-clock.is-running { color: var(--color-ink); font-weight: 700; }
 
 /* The other side mirrors it: its fee stands next to the middle, its name outside. */
@@ -115,7 +130,8 @@
 .bsp-fee.is-b b { grid-area: 1 / 1; justify-self: start; }
 .bsp-fee.is-b small { grid-area: 1 / 2; }
 .bsp-fee.is-b span { grid-area: 1 / 3; justify-self: end; }
-.bsp-fee.is-b .bsp-clock { text-align: right; }
+.bsp-fee.is-b .bsp-clock { justify-self: end; text-align: right; }
+.bsp-fee.is-b .bsp-corners { justify-self: start; }
 .bsp-fee.is-w.is-turn { border-color: var(--bs-w); color: var(--color-ink); }
 .bsp-fee.is-b.is-turn { border-color: var(--bs-b); color: var(--color-ink); }
 

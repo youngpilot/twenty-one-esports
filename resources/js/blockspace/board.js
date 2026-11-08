@@ -12,7 +12,7 @@
  */
 // board.css comes with boardGame.js: as a dependency of this lazily loaded module it kept the import pending (see there).
 import { setFocus } from '../focusMode.js';
-import { BONUS, C, N, NAMES, ORDER, ORI, R, SIZE, START, cellName, cellOf, flip, key, moveText, readPieces, refuse, rot } from './engine.js';
+import { BONUS, C, N, NAMES, ORDER, ORI, R, SIZE, START, cellName, cellOf, flip, freeCorners, key, moveText, readPieces, refuse, rot } from './engine.js';
 import { CELL, SIDES, element, form, joints, stone, stoneDefs } from './stones.js';
 
 /** A block's colour by what it pays, from a cheap green to a rich magenta, as a fee explorer shows the mempool. */
@@ -210,9 +210,13 @@ export function mountPieceBoard(c) {
         const name = html('span', '');
         const unit = html('small', '', 'sat');
         const clock = html('time', 'bsp-clock');
-        card.append(name, value, unit, clock);
+        // The free corners: where the yield lies ahead. A side with none left is out, so the count says who is winning the room.
+        const corners = html('em', 'bsp-corners');
+        corners.dataset.test = 'corners-' + side;
+        corners.title = words.cornersTitle;
+        card.append(name, value, unit, clock, corners);
 
-        return { card, value, name, side, clock };
+        return { card, value, name, side, clock, corners };
     });
     const order = html('div', 'bsp-order');
     const marks = html('div', 'bsp-marks');
@@ -373,8 +377,12 @@ export function mountPieceBoard(c) {
             group.classList.toggle('is-due', active && shown.side === index && !shown.played[index]);
             group.style.display = shown.played[index] ? 'none' : '';
         });
-        feeOf.forEach(({ card, value, name, side }, index) => {
+        feeOf.forEach(({ card, value, name, side, corners }, index) => {
             value.textContent = shown.score[index];
+            // Shown once a side has set its first stones; before, its start cell is its only corner.
+            const free = shown.played[index] ? freeCorners(shown, index) : null;
+            corners.textContent = free === null ? '' : free === 1 ? words.corner : words.corners.replace(':count', free);
+            corners.classList.toggle('is-low', free !== null && free <= 2);
             name.textContent = SIDES[side].sign + ' ' + (side === 'w' ? c.t.white : c.t.black) + (c.color === side ? ' (' + words.you + ')' : '');
             card.classList.toggle('is-turn', active && shown.side === index);
         });

@@ -58,7 +58,7 @@ for (const lesson of lessons) {
                 return result === 'done';
             });
             assert.ok(good.length > 0, lesson.id + ': some move reaches the goal');
-            if (['touch', 'fee', 'slot'].includes(lesson.goal)) assert.ok(good.length < options.length, lesson.id + ': not every move does');
+            if (['touch', 'fee', 'slot', 'shut'].includes(lesson.goal)) assert.ok(good.length < options.length, lesson.id + ': not every move does');
         }
         if (lesson.id === 'turn') {
             // Turned alone the form fits nowhere: every way to set it is a mirrored one.
