@@ -97,7 +97,7 @@ export function mountPieceBoard(c) {
     const jointLayer = element('g');
     const stoneLayer = element('g');
     const lastLayer = element('g');
-    const ghost = element('g', { class: 'bs-ghost' });
+    const ghost = element('g', { class: 'bsp-ghost' });
     svg.append(cells, coordinates, starts, jointLayer, stoneLayer, lastLayer, ghost);
     const stoneAt = new Map();
 
@@ -121,10 +121,10 @@ export function mountPieceBoard(c) {
             const x = col * CELL;
             const y = r * CELL;
             const colour = SIDES[side].colour;
-            const group = element('g', { class: 'bs-start', 'data-start': side });
+            const group = element('g', { class: 'bsp-start', 'data-start': side });
             group.append(
                 element('rect', { x: x + 4, y: y + 4, width: CELL - 8, height: CELL - 8, rx: 8, fill: colour, 'fill-opacity': 0.16 }),
-                element('rect', { x: x + 38, y: y + 38, width: 24, height: 24, rx: 4, fill: colour, class: 'bs-start-mark' }),
+                element('rect', { x: x + 38, y: y + 38, width: 24, height: 24, rx: 4, fill: colour, class: 'bsp-start-mark' }),
             );
             starts.append(group);
         });
@@ -204,18 +204,18 @@ export function mountPieceBoard(c) {
     const help = stage.querySelector('[data-piece-help]');
 
     const feeOf = SIDE_KEYS.map((side) => {
-        const card = html('div', 'bs-fee is-' + side);
+        const card = html('div', 'bsp-fee is-' + side);
         card.dataset.test = 'fee-' + side;
         const value = html('b', '', '0');
         const name = html('span', '');
         const unit = html('small', '', 'sat');
-        const clock = html('time', 'bs-clock');
+        const clock = html('time', 'bsp-clock');
         card.append(name, value, unit, clock);
 
         return { card, value, name, side, clock };
     });
-    const order = html('div', 'bs-order');
-    const marks = html('div', 'bs-marks');
+    const order = html('div', 'bsp-order');
+    const marks = html('div', 'bsp-marks');
     marks.setAttribute('aria-hidden', 'true');
     const orderMarks = ORDER.map((side) => {
         const mark = html('i', 'is-' + SIDE_KEYS[side]);
@@ -229,23 +229,23 @@ export function mountPieceBoard(c) {
     head.replaceChildren(feeOf[0].card, order, feeOf[1].card);
     ladder.replaceChildren();
     // On a phone the ladder lies folded beside the block, a tap on this opens it in full size over the block.
-    const fold = html('button', 'bs-fold', '‹');
+    const fold = html('button', 'bsp-fold', '‹');
     fold.type = 'button';
     fold.dataset.test = 'ladder-fold';
     fold.hidden = true;
     fold.addEventListener('click', () => unfold(!ladder.classList.contains('is-open')));
-    const nextSlot = html('div', 'bs-next');
+    const nextSlot = html('div', 'bsp-next');
     nextSlot.dataset.test = 'ladder-next';
     nextSlot.setAttribute('role', 'note');
     const nextPicture = element('svg', { 'aria-hidden': 'true' });
-    const nextSize = html('span', 'bs-next-size');
-    nextSlot.append(html('span', 'bs-next-label', words.next), nextPicture, nextSize);
+    const nextSize = html('span', 'bsp-next-size');
+    nextSlot.append(html('span', 'bsp-next-label', words.next), nextPicture, nextSize);
     ladder.append(fold, nextSlot);
 
-    const note = html('p', 'bs-note');
+    const note = html('p', 'bsp-note');
     note.setAttribute('role', 'alert');
     note.dataset.test = 'piece-note';
-    const hint = html('p', 'bs-hint');
+    const hint = html('p', 'bsp-hint');
     hint.dataset.test = 'piece-hint';
     // What a screen reader hears of the block: the stones shown and the moves made.
     const speech = html('p', 'sr-only');
@@ -254,9 +254,9 @@ export function mountPieceBoard(c) {
     const say = (text) => {
         if (speech.textContent !== text) speech.textContent = text;
     };
-    const buttons = html('div', 'bs-buttons');
+    const buttons = html('div', 'bsp-buttons');
     const button = (label, test, run) => {
-        const node = html('button', 'bs-button', label);
+        const node = html('button', 'bsp-button', label);
         node.type = 'button';
         node.dataset.test = test;
         node.addEventListener('click', run);
@@ -280,15 +280,15 @@ export function mountPieceBoard(c) {
     help.textContent = matchMedia('(hover: none)').matches ? words.touch : words.mouse;
 
     function makeTile(f) {
-        const node = html('button', 'bs-rung');
+        const node = html('button', 'bsp-rung');
         node.type = 'button';
-        const front = html('span', 'bs-front');
+        const front = html('span', 'bsp-front');
         const picture = element('svg', { viewBox: `0 0 ${5 * CELL} ${3 * CELL}`, 'aria-hidden': 'true' });
-        const pay = html('span', 'bs-pay');
+        const pay = html('span', 'bsp-pay');
         const sats = html('b');
         const parts = html('small');
         pay.append(sats, parts);
-        front.append(pay, picture, html('span', 'bs-fuse'));
+        front.append(pay, picture, html('span', 'bsp-fuse'));
         node.append(front);
         const shape = ORI[f][flatOf(f)];
         const height = Math.max(...shape.map((part) => part[0])) + 1;
@@ -580,7 +580,7 @@ export function mountPieceBoard(c) {
     function lowerEdge() {
         const tabbar = document.documentElement.classList.contains('is-focus') ? 0 : parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
         const sheet = document.querySelector('[data-test=chat-sheet-toggle]')?.closest('section');
-        const open = !document.documentElement.classList.contains('bs-playing') && matchMedia('(width < 64rem)').matches && sheet && getComputedStyle(sheet).position === 'fixed' && sheet.getBoundingClientRect().height > 0;
+        const open = !document.documentElement.classList.contains('bsp-playing') && matchMedia('(width < 64rem)').matches && sheet && getComputedStyle(sheet).position === 'fixed' && sheet.getBoundingClientRect().height > 0;
 
         let edge = open ? Math.min(innerHeight - tabbar, sheet.getBoundingClientRect().top) : innerHeight - tabbar;
         // The action dock's bar and tab (components/⚡match-dock) stand on top of that: nothing of the game lies under them.
@@ -639,7 +639,7 @@ export function mountPieceBoard(c) {
         const low = phone && innerHeight < 500;
         const compact = phone && !low;
         stage.classList.toggle('is-compact', compact);
-        document.documentElement.classList.toggle('bs-playing', compact && c.color !== null && c.state.status === 'active');
+        document.documentElement.classList.toggle('bsp-playing', compact && c.color !== null && c.state.status === 'active');
         help.textContent = low ? words.portrait : matchMedia('(hover: none)').matches ? words.touch : words.mouse;
         const edge = lowerEdge();
         if (compact) return fitPhone(edge);
@@ -685,7 +685,7 @@ export function mountPieceBoard(c) {
     const clocks = setInterval(() => {
         if (!svg.isConnected) {
             leaving.abort();
-            document.documentElement.classList.remove('bs-playing');
+            document.documentElement.classList.remove('bsp-playing');
 
             return clearInterval(clocks);
         }
@@ -717,7 +717,7 @@ export function mountPieceBoard(c) {
             if (!hand) return false;
             if (name === 'r') turn(rot);
             else if (name === 'f') turn(flip);
-            else if (name === 'enter' && !event.target.closest?.('a, .bs-button')) {
+            else if (name === 'enter' && !event.target.closest?.('a, .bsp-button')) {
                 // Also from the rung it came from: Enter sets the stones, it does not put them back.
                 event.preventDefault();
                 commit();
